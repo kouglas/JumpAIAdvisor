@@ -16,7 +16,7 @@ struct ContentView: View {
         var body: some View {
             NavigationStack {
                 ZStack {
-                    // Modern gradient background
+                    //  gradient background
                     LinearGradient(
                         colors: [Color.black, Color.black.opacity(0.95)],
                         startPoint: .top,
@@ -25,12 +25,12 @@ struct ContentView: View {
                     .ignoresSafeArea()
                     
                     // Chat interface
-                    ModernChatView(chatManager: chatManager)
+                    ChatView(chatManager: chatManager)
                         .navigationBarHidden(true)
                     
                     // Custom navigation bar
                     VStack {
-                        ModernNavigationBar(
+                        NavigationBar(
                             title: "Chat",
                             leftButton: AnyView(
                                 Button(action: {
@@ -40,7 +40,7 @@ struct ContentView: View {
                                 }) {
                                     Image(systemName: "line.3.horizontal")
                                         .font(.system(size: 20, weight: .semibold))
-                                        .foregroundStyle(ModernGradients.primary)
+                                        .foregroundStyle(Gradients.primary)
                                         .frame(width: 44, height: 44)
                                         .background(
                                             Circle()
@@ -69,13 +69,13 @@ struct ContentView: View {
                     }
                 }
                 .sheet(isPresented: $showConversationList) {
-                    ModernConversationListView(chatManager: chatManager)
+                    ConversationListView(chatManager: chatManager)
                         .presentationDragIndicator(.visible)
                         .presentationCornerRadius(30)
                         .presentationBackground(.ultraThinMaterial)
                 }
                 .fullScreenCover(isPresented: $showRealTimeChat) {
-                    ModernRealTimeChatView()
+                    RealTimeChatView()
                         .presentationBackground(.black)
                 }
             }
@@ -95,18 +95,18 @@ struct AnimatedVoiceButton: View {
             ZStack {
                 // Ripple effect
                 Circle()
-                    .stroke(ModernGradients.primary, lineWidth: 2)
+                    .stroke(Gradients.primary, lineWidth: 2)
                     .scaleEffect(rippleScale)
                     .opacity(isAnimating ? 0 : 0.7)
                     
                 Circle()
-                    .stroke(ModernGradients.primary, lineWidth: 2)
+                    .stroke(Gradients.primary, lineWidth: 2)
                     .scaleEffect(rippleScale * 1.2)
                     .opacity(isAnimating ? 0 : 0.5)
                 
                 // Main button
                 Circle()
-                    .fill(ModernGradients.primary)
+                    .fill(Gradients.primary)
                     .frame(width: 60, height: 60)
                     .overlay {
                         Image(systemName: "waveform")
@@ -126,8 +126,8 @@ struct AnimatedVoiceButton: View {
     }
 }
 
-// MARK: - Modern Chat View
-struct ModernChatView: View {
+// MARK: -  Chat View
+struct ChatView: View {
     @ObservedObject var chatManager: ChatManager
     @State private var messageText = ""
     @State private var textEditorHeight: CGFloat = 44
@@ -135,12 +135,12 @@ struct ModernChatView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Messages with modern scroll behavior
+            // Messages with  scroll behavior
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 16) {
                         ForEach(chatManager.currentConversation?.messages ?? []) { message in
-                            ModernMessageBubble(message: message)
+                            MessageBubble(message: message)
                                 .id(message.id)
                         }
                     }
@@ -154,8 +154,8 @@ struct ModernChatView: View {
                 }
             }
             
-            // Modern input area
-            ModernMessageInputView(
+            //  input area
+            MessageInputView(
                 messageText: $messageText,
                 textEditorHeight: $textEditorHeight,
                 isInputFocused: _isInputFocused,
@@ -176,8 +176,8 @@ struct ModernChatView: View {
     }
 }
 
-// MARK: - Modern Message Input View
-struct ModernMessageInputView: View {
+// MARK: -  Message Input View
+struct MessageInputView: View {
     @Binding var messageText: String
     @Binding var textEditorHeight: CGFloat
     @FocusState var isInputFocused: Bool
@@ -185,7 +185,7 @@ struct ModernMessageInputView: View {
     
     var body: some View {
         HStack(alignment: .bottom, spacing: 12) {
-            ModernInputField(
+            InputField(
                 text: $messageText,
                 height: $textEditorHeight,
                 isFocused: _isInputFocused,
@@ -205,7 +205,7 @@ struct ModernMessageInputView: View {
                 .fill(.ultraThickMaterial)
                 .overlay {
                     Rectangle()
-                        .fill(ModernGradients.glass)
+                        .fill(Gradients.glass)
                         .frame(height: 1)
                         .frame(maxHeight: .infinity, alignment: .top)
                 }

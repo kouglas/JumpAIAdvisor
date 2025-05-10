@@ -8,7 +8,7 @@
 import SwiftUI
 import AVFoundation
 
-struct ModernRealTimeChatView: View {
+struct RealTimeChatView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var audioManager = AudioManager()
     @State private var isListening = false
@@ -23,7 +23,7 @@ struct ModernRealTimeChatView: View {
             
             // Content
             VStack {
-                // Close button with modern styling
+                // Close button with  styling
                 HStack {
                     Button(action: {
                         audioManager.stopListening()
@@ -49,9 +49,9 @@ struct ModernRealTimeChatView: View {
                 // Center visualization
                 ZStack {
                     if isAISpeaking {
-                        ModernAudioVisualizer(data: $visualizerData)
+                        AudioVisualizer(data: $visualizerData)
                     } else {
-                        ModernOrbitingLines(isActive: isListening)
+                        OrbitingLines(isActive: isListening)
                     }
                 }
                 .frame(height: 200)
@@ -143,8 +143,8 @@ struct AnimatedGradientBackground: View {
     }
 }
 
-// MARK: - Modern Orbiting Lines
-struct ModernOrbitingLines: View {
+// MARK: -  Orbiting Lines
+struct OrbitingLines: View {
     let isActive: Bool
     @State private var rotation = 0.0
     @State private var scale = 1.0
@@ -198,9 +198,9 @@ struct ModernOrbitingLines: View {
     }
 }
 
-// MARK: - Modern Audio Visualizer
-struct ModernAudioVisualizer: View {
-    @Binding var data: [CGFloat]
+// MARK: -  Audio Visualizer
+struct AudioVisualizer: View {
+    @Binding var data: [Double]
     
     var body: some View {
         GeometryReader { geometry in
@@ -243,7 +243,7 @@ struct StatusIndicator: View {
         Text(text)
             .font(.system(size: 20, weight: .semibold, design: .rounded))
             .foregroundStyle(
-                isActive ? ModernGradients.primary : LinearGradient(colors: [.white.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
+                isActive ? Gradients.primary : LinearGradient(colors: [.white.opacity(0.8)], startPoint: .leading, endPoint: .trailing)
             )
             .padding(.horizontal, 24)
             .padding(.vertical, 12)
@@ -253,7 +253,7 @@ struct StatusIndicator: View {
                     .overlay {
                         Capsule()
                             .stroke(
-                                isActive ? ModernGradients.primary : LinearGradient(colors: [.white.opacity(0.2)], startPoint: .leading, endPoint: .trailing),
+                                isActive ? Gradients.primary : LinearGradient(colors: [.white.opacity(0.2)], startPoint: .leading, endPoint: .trailing),
                                 lineWidth: 1
                             )
                     }

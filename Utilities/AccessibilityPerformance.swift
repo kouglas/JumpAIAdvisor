@@ -18,9 +18,12 @@ extension View {
             .accessibilityAddTraits(type)
     }
     
-    func dynamicTypeSize(_ range: ClosedRange<DynamicTypeSize>) -> some View {
-        self.dynamicTypeSize(range)
-    }
+//    func dynamicTypeSize(_ range: ClosedRange<DynamicTypeSize>)  {
+//        self.dynamicTypeSize(range)
+//        
+//        return
+//
+//    }
 }
 
 // MARK: - Performance Optimizations

@@ -1,6 +1,6 @@
 import SwiftUI
 
-struct ModernConversationListView: View {
+struct ConversationListView: View {
     @ObservedObject var chatManager: ChatManager
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
@@ -14,11 +14,11 @@ struct ModernConversationListView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Modern header
+                    //  header
                     HStack {
                         Text("Conversations")
                             .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .foregroundStyle(ModernGradients.primary)
+                            .foregroundStyle(Gradients.primary)
                         
                         Spacer()
                         
@@ -28,7 +28,7 @@ struct ModernConversationListView: View {
                         }) {
                             Image(systemName: "plus.circle.fill")
                                 .font(.system(size: 28))
-                                .foregroundStyle(ModernGradients.primary)
+                                .foregroundStyle(Gradients.primary)
                                 .symbolEffect(.pulse)
                         }
                     }
@@ -37,7 +37,7 @@ struct ModernConversationListView: View {
                     .padding(.bottom, 20)
                     
                     // Search bar
-                    ModernSearchBar(text: $searchText)
+                    SearchBar(text: $searchText)
                         .padding(.horizontal, 24)
                         .padding(.bottom, 16)
                     
@@ -45,7 +45,7 @@ struct ModernConversationListView: View {
                     ScrollView {
                         LazyVStack(spacing: 12) {
                             ForEach(filteredConversations) { conversation in
-                                ModernConversationCard(
+                                ConversationCard(
                                     conversation: conversation,
                                     isSelected: selectedConversation?.id == conversation.id
                                 )
@@ -78,8 +78,8 @@ struct ModernConversationListView: View {
     }
 }
 
-// MARK: - Modern Search Bar
-struct ModernSearchBar: View {
+// MARK: -  Search Bar
+struct SearchBar: View {
     @Binding var text: String
     @FocusState private var isFocused: Bool
     
@@ -112,7 +112,7 @@ struct ModernSearchBar: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .stroke(
-                            isFocused ? ModernGradients.primary : LinearGradient(colors: [.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing),
+                            isFocused ? Gradients.primary : LinearGradient(colors: [.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing),
                             lineWidth: 1
                         )
                 }
@@ -120,8 +120,8 @@ struct ModernSearchBar: View {
     }
 }
 
-// MARK: - Modern Conversation Card
-struct ModernConversationCard: View {
+// MARK: -  Conversation Card
+struct ConversationCard: View {
     let conversation: Conversation
     let isSelected: Bool
     @State private var appeared = false
@@ -164,7 +164,7 @@ struct ModernConversationCard: View {
                 .overlay {
                     RoundedRectangle(cornerRadius: 20, style: .continuous)
                         .stroke(
-                            isSelected ? ModernGradients.primary : LinearGradient(colors: [.gray.opacity(0.2)], startPoint: .leading, endPoint: .trailing),
+                            isSelected ? Gradients.primary : LinearGradient(colors: [.gray.opacity(0.2)], startPoint: .leading, endPoint: .trailing),
                             lineWidth: isSelected ? 2 : 1
                         )
                 }

@@ -10,7 +10,7 @@ import Foundation
 
 struct Message: Identifiable, Codable {
     let id = UUID()
-    let content: String
+    var content: String
     let isUser: Bool
     let timestamp: Date
     var isThinking: Bool = false

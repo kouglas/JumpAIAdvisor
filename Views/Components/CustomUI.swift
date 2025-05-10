@@ -1,7 +1,8 @@
 import SwiftUI
+import AVFAudio
 
-// MARK: - Modern Gradient Definitions
-struct ModernGradients {
+// MARK: -  Gradient Definitions
+struct Gradients {
     static let primary = LinearGradient(
         colors: [.blue, .purple, .pink],
         startPoint: .topLeading,
@@ -111,7 +112,7 @@ struct GlassMorphismCard: View {
             .overlay {
                 RoundedRectangle(cornerRadius: 20)
                     .stroke(
-                        ModernGradients.glass,
+                        Gradients.glass,
                         lineWidth: 1
                     )
             }
@@ -129,7 +130,7 @@ struct AnimatedSendButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(isEnabled ? ModernGradients.primary : LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom))
+                    .fill(isEnabled ? Gradients.primary : LinearGradient(colors: [.gray], startPoint: .top, endPoint: .bottom))
                     .frame(width: 44, height: 44)
                 
                 Image(systemName: "arrow.up")
@@ -153,8 +154,8 @@ struct AnimatedSendButton: View {
     }
 }
 
-// MARK: - Modern Message Bubble
-struct ModernMessageBubble: View {
+// MARK: -  Message Bubble
+struct MessageBubble: View {
     let message: Message
     @State private var appeared = false
     @State private var isPlaying = false
@@ -165,7 +166,7 @@ struct ModernMessageBubble: View {
             if !message.isUser {
                 // AI Avatar
                 Circle()
-                    .fill(ModernGradients.primary)
+                    .fill(Gradients.primary)
                     .frame(width: 32, height: 32)
                     .overlay {
                         Image(systemName: "brain.head.profile")
@@ -183,20 +184,20 @@ struct ModernMessageBubble: View {
                 if message.isThinking {
                     ThinkingIndicator()
                 } else {
-                    // Message content with modern styling
-                    MarkdownText(message.content)
+                    // Message content with  styling
+                    Markdown(text: message.content)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background {
                             if message.isUser {
                                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .fill(ModernGradients.primary)
+                                    .fill(Gradients.primary)
                             } else {
                                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                                     .fill(.ultraThinMaterial)
                                     .overlay {
                                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                            .stroke(ModernGradients.glass, lineWidth: 1)
+                                            .stroke(Gradients.glass, lineWidth: 1)
                                     }
                             }
                         }
@@ -229,7 +230,7 @@ struct ModernMessageBubble: View {
             if message.isUser {
                 // User Avatar
                 Circle()
-                    .fill(ModernGradients.accent)
+                    .fill(Gradients.accent)
                     .frame(width: 32, height: 32)
                     .overlay {
                         Image(systemName: "person.fill")
@@ -263,7 +264,7 @@ struct ModernMessageBubble: View {
     }
 }
 
-// MARK: - Modern Action Button
+// MARK: -  Action Button
 struct ActionButton: View {
     let icon: String
     let title: String
@@ -296,7 +297,7 @@ struct ActionButton: View {
     }
 }
 
-// MARK: - Modern Thinking Indicator
+// MARK: -  Thinking Indicator
 struct ThinkingIndicator: View {
     @State private var dots = [false, false, false]
     
@@ -304,7 +305,7 @@ struct ThinkingIndicator: View {
         HStack(spacing: 8) {
             ForEach(0..<3) { index in
                 Circle()
-                    .fill(ModernGradients.primary)
+                    .fill(Gradients.primary)
                     .frame(width: 10, height: 10)
                     .scaleEffect(dots[index] ? 1.3 : 0.8)
                     .animation(
@@ -322,7 +323,7 @@ struct ThinkingIndicator: View {
                 .fill(.ultraThinMaterial)
                 .overlay {
                     Capsule()
-                        .stroke(ModernGradients.glass, lineWidth: 1)
+                        .stroke(Gradients.glass, lineWidth: 1)
                 }
         }
         .onAppear {
@@ -333,8 +334,8 @@ struct ThinkingIndicator: View {
     }
 }
 
-// MARK: - Modern Input Field
-struct ModernInputField: View {
+// MARK: -  Input Field
+struct InputField: View {
     @Binding var text: String
     @Binding var height: CGFloat
     @FocusState var isFocused: Bool
@@ -372,7 +373,7 @@ struct ModernInputField: View {
                         .overlay {
                             RoundedRectangle(cornerRadius: 25, style: .continuous)
                                 .stroke(
-                                    isFocused ? ModernGradients.primary : LinearGradient(colors: [.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing),
+                                    isFocused ? Gradients.primary : LinearGradient(colors: [.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing),
                                     lineWidth: 2
                                 )
                         }
@@ -395,8 +396,8 @@ struct ModernInputField: View {
     }
 }
 
-// MARK: - Modern Navigation Bar
-struct ModernNavigationBar: View {
+// MARK: -  Navigation Bar
+struct NavigationBar: View {
     let title: String
     let leftButton: AnyView?
     let rightButton: AnyView?
@@ -417,7 +418,7 @@ struct ModernNavigationBar: View {
             
             Text(title)
                 .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(ModernGradients.primary)
+                .foregroundStyle(Gradients.primary)
             
             Spacer()
             

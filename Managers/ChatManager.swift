@@ -33,7 +33,12 @@ class ChatManager: ObservableObject {
     }
     
     func sendMessage(_ content: String) {
-        guard !content.isEmpty, var conversation = currentConversation else { return }
+        print("🔍 Debug: Sending message: \(content)")
+        
+        guard !content.isEmpty, var conversation = currentConversation else {
+            print("❌ Debug: Empty content or no conversation")
+            return
+        }
         
         // Add user message
         let userMessage = Message(content: content, isUser: true)
@@ -43,11 +48,7 @@ class ChatManager: ObservableObject {
         let thinkingMessage = Message(content: "", isUser: false, isThinking: true)
         conversation.messages.append(thinkingMessage)
         
-        // Update conversation title if it's the first message
-        if conversation.messages.count == 2 {
-            conversation.title = String(content.prefix(30)) + (content.count > 30 ? "..." : "")
-        }
-        
+        // Update conversation
         conversation.updatedAt = Date()
         updateConversation(conversation)
         
@@ -56,19 +57,18 @@ class ChatManager: ObservableObject {
         streamingContent = ""
         HapticFeedback.tick()
         
-        // Get all messages except the thinking one
-        let messagesForAPI = conversation.messages.filter { !$0.isThinking }
+        print("🔍 Debug: Starting API call with \(conversation.messages.count) messages")
         
         openAIService.streamChatCompletion(
-            messages: messagesForAPI,
+            messages: conversation.messages.filter { !$0.isThinking },
             onReceive: { [weak self] token in
+                print("🔍 Debug: Received token: \(token)")
+                
                 guard let self = self else { return }
                 
-                // First token received
                 if self.streamingContent.isEmpty {
                     HapticFeedback.tick()
                     
-                    // Remove thinking message and add AI message
                     if var updatedConversation = self.currentConversation {
                         updatedConversation.messages.removeAll { $0.isThinking }
                         let aiMessage = Message(content: token, isUser: false)
@@ -76,7 +76,6 @@ class ChatManager: ObservableObject {
                         self.updateConversation(updatedConversation)
                     }
                 } else {
-                    // Append token to existing message
                     if var updatedConversation = self.currentConversation,
                        let lastIndex = updatedConversation.messages.lastIndex(where: { !$0.isUser && !$0.isThinking }) {
                         var message = updatedConversation.messages[lastIndex]
@@ -89,10 +88,13 @@ class ChatManager: ObservableObject {
                 self.streamingContent += token
             },
             onComplete: { [weak self] in
+                print("✅ Debug: Stream completed")
                 self?.isLoading = false
                 self?.streamingContent = ""
             },
             onError: { [weak self] error in
+                print("❌ Debug: Error occurred: \(error.localizedDescription)")
+                
                 guard let self = self else { return }
                 self.isLoading = false
                 self.errorMessage = error.localizedDescription
@@ -100,6 +102,13 @@ class ChatManager: ObservableObject {
                 // Remove thinking message on error
                 if var updatedConversation = self.currentConversation {
                     updatedConversation.messages.removeAll { $0.isThinking }
+                    
+                    // Add error message
+                    let errorMessage = Message(
+                        content: "Error: \(error.localizedDescription)",
+                        isUser: false
+                    )
+                    updatedConversation.messages.append(errorMessage)
                     self.updateConversation(updatedConversation)
                 }
                 

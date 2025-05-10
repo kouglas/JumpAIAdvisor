@@ -10,9 +10,22 @@
 		4A1EE7BF2DCFF8D300DEA35B /* JumpAIAdvisor.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JumpAIAdvisor.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4A1EE7FF2DD009BC00DEA35B /* Exceptions for "JumpAIAdvisor" folder in "JumpAIAdvisor" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4A1EE7BE2DCFF8D300DEA35B /* JumpAIAdvisor */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		4A1EE7C12DCFF8D300DEA35B /* JumpAIAdvisor */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4A1EE7FF2DD009BC00DEA35B /* Exceptions for "JumpAIAdvisor" folder in "JumpAIAdvisor" target */,
+			);
 			path = JumpAIAdvisor;
 			sourceTree = "<group>";
 		};
@@ -290,6 +303,7 @@
 				DEVELOPMENT_TEAM = 8CZ93KGP23;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JumpAIAdvisor/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access for voice chat functionality";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "This app needs speech recognition to transcribe your voice";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -321,6 +335,7 @@
 				DEVELOPMENT_TEAM = 8CZ93KGP23;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = JumpAIAdvisor/Info.plist;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs microphone access for voice chat functionality";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "This app needs speech recognition to transcribe your voice";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

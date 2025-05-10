@@ -212,7 +212,7 @@ struct MessageInputView: View {
         }
     }
 }
-//#Preview {
-//    ContentView()
-//    .preferredColorScheme(.dark)
-//}
+#Preview {
+    ContentView()
+    .preferredColorScheme(.dark)
+}

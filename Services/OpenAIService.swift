@@ -11,6 +11,14 @@ class OpenAIService {
         onComplete: @escaping () -> Void,
         onError: @escaping (Error) -> Void
     ) {
+        print("🔍 Debug: Starting API call")
+        print("🔍 Debug: API Key present: \(OpenAIConfig.hasValidAPIKey)")
+        
+        guard OpenAIConfig.hasValidAPIKey else {
+            onError(OpenAIError.missingAPIKey)
+            return
+        }
+        
         guard let url = URL(string: OpenAIConfig.baseURL + OpenAIConfig.streamEndpoint) else {
             onError(OpenAIError.invalidURL)
             return
@@ -43,80 +51,99 @@ class OpenAIService {
             return
         }
         
-        streamTask = session.dataTask(with: request) { [weak self] data, response, error in
-            if let error = error {
-                DispatchQueue.main.async {
-                    onError(OpenAIError.networkError(error))
-                }
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                DispatchQueue.main.async {
-                    onError(OpenAIError.invalidResponse)
-                }
-                return
-            }
-            
-            if httpResponse.statusCode != 200 {
-                if let data = data,
-                   let errorMessage = String(data: data, encoding: .utf8) {
-                    DispatchQueue.main.async {
-                        onError(OpenAIError.apiError(errorMessage))
-                    }
-                } else {
-                    DispatchQueue.main.async {
-                        onError(OpenAIError.apiError("HTTP \(httpResponse.statusCode)"))
-                    }
-                }
-                return
-            }
-            
-            guard let data = data else { return }
-            
-            self?.handleStreamData(data, onReceive: onReceive, onComplete: onComplete, onError: onError)
-        }
+        // Use URLSessionDataDelegate for streaming
+        let configuration = URLSessionConfiguration.default
+        let session = URLSession(configuration: configuration, delegate: StreamingDelegate(
+            onReceive: onReceive,
+            onComplete: onComplete,
+            onError: onError
+        ), delegateQueue: nil)
         
+        streamTask = session.dataTask(with: request)
         streamTask?.resume()
-    }
-    
-    private func handleStreamData(
-        _ data: Data,
-        onReceive: @escaping (String) -> Void,
-        onComplete: @escaping () -> Void,
-        onError: @escaping (Error) -> Void
-    ) {
-        let lines = String(data: data, encoding: .utf8)?.components(separatedBy: "\n") ?? []
-        
-        for line in lines {
-            if line.hasPrefix("data: ") {
-                let jsonString = String(line.dropFirst(6))
-                
-                if jsonString == "[DONE]" {
-                    DispatchQueue.main.async {
-                        onComplete()
-                    }
-                    return
-                }
-                
-                if let jsonData = jsonString.data(using: .utf8),
-                   let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
-                   let choices = json["choices"] as? [[String: Any]],
-                   let firstChoice = choices.first,
-                   let delta = firstChoice["delta"] as? [String: Any],
-                   let content = delta["content"] as? String {
-                    
-                    DispatchQueue.main.async {
-                        onReceive(content)
-                    }
-                }
-            }
-        }
     }
     
     func cancelStream() {
         streamTask?.cancel()
         streamTask = nil
+    }
+}
+
+// Streaming delegate to handle SSE data
+private class StreamingDelegate: NSObject, URLSessionDataDelegate {
+    private let onReceive: (String) -> Void
+    private let onComplete: () -> Void
+    private let onError: (Error) -> Void
+    private var buffer = ""
+    
+    init(onReceive: @escaping (String) -> Void,
+         onComplete: @escaping () -> Void,
+         onError: @escaping (Error) -> Void) {
+        self.onReceive = onReceive
+        self.onComplete = onComplete
+        self.onError = onError
+    }
+    
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        guard let text = String(data: data, encoding: .utf8) else { return }
+        buffer += text
+        
+        // Process complete lines
+        let lines = buffer.components(separatedBy: "\n")
+        for i in 0..<lines.count - 1 {
+            processLine(lines[i])
+        }
+        
+        // Keep the last incomplete line in the buffer
+        buffer = lines.last ?? ""
+    }
+    
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        if let error = error {
+            DispatchQueue.main.async {
+                self.onError(error)
+            }
+        } else {
+            // Process any remaining data in buffer
+            if !buffer.isEmpty {
+                processLine(buffer)
+            }
+            DispatchQueue.main.async {
+                self.onComplete()
+            }
+        }
+    }
+    
+    private func processLine(_ line: String) {
+        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Skip empty lines
+        if trimmedLine.isEmpty {
+            return
+        }
+        
+        // Check for completion
+        if trimmedLine == "data: [DONE]" {
+            return
+        }
+        
+        // Extract JSON from SSE format
+        if trimmedLine.hasPrefix("data: ") {
+            let jsonString = String(trimmedLine.dropFirst(6))
+            
+            guard let jsonData = jsonString.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: jsonData) as? [String: Any],
+                  let choices = json["choices"] as? [[String: Any]],
+                  let firstChoice = choices.first,
+                  let delta = firstChoice["delta"] as? [String: Any],
+                  let content = delta["content"] as? String else {
+                return
+            }
+            
+            DispatchQueue.main.async {
+                self.onReceive(content)
+            }
+        }
     }
 }
 

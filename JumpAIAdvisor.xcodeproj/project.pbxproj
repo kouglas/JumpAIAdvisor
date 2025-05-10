@@ -16,6 +16,31 @@
 			path = JumpAIAdvisor;
 			sourceTree = "<group>";
 		};
+		4A1EE7D22DCFFB9000DEA35B /* Models */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		4A1EE7D42DCFFBD500DEA35B /* Views */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		4A1EE7D72DCFFC0400DEA35B /* Managers */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		4A1EE7DC2DCFFC4700DEA35B /* Services */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Services;
+			sourceTree = "<group>";
+		};
+		4A1EE7DE2DCFFC5800DEA35B /* Utilities */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Utilities;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,8 +57,13 @@
 		4A1EE7B62DCFF8D300DEA35B = {
 			isa = PBXGroup;
 			children = (
+				4A1EE7DC2DCFFC4700DEA35B /* Services */,
 				4A1EE7C12DCFF8D300DEA35B /* JumpAIAdvisor */,
 				4A1EE7C02DCFF8D300DEA35B /* Products */,
+				4A1EE7D22DCFFB9000DEA35B /* Models */,
+				4A1EE7D42DCFFBD500DEA35B /* Views */,
+				4A1EE7D72DCFFC0400DEA35B /* Managers */,
+				4A1EE7DE2DCFFC5800DEA35B /* Utilities */,
 			);
 			sourceTree = "<group>";
 		};
@@ -62,6 +92,11 @@
 			);
 			fileSystemSynchronizedGroups = (
 				4A1EE7C12DCFF8D300DEA35B /* JumpAIAdvisor */,
+				4A1EE7D22DCFFB9000DEA35B /* Models */,
+				4A1EE7D42DCFFBD500DEA35B /* Views */,
+				4A1EE7D72DCFFC0400DEA35B /* Managers */,
+				4A1EE7DC2DCFFC4700DEA35B /* Services */,
+				4A1EE7DE2DCFFC5800DEA35B /* Utilities */,
 			);
 			name = JumpAIAdvisor;
 			packageProductDependencies = (

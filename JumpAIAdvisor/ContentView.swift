@@ -9,6 +9,22 @@ import SwiftUI
 import AVFAudio
 import AVFoundation
 
+
+extension ContentView {
+    func keyboardDismissToolbar() -> some View {
+            self.toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
+        }
+}
+// Fix 2: Keep input field attached to keyboard
+// Update ContentView keyboard handling
+
 struct ContentView: View {
     @ObservedObject var chatManager: ChatManager
     @State private var messageText = ""
@@ -18,83 +34,85 @@ struct ContentView: View {
     @State private var showRealTimeChat = false
     @State private var keyboardHeight: CGFloat = 0
     
+    
     var body: some View {
         NavigationStack {
-            ZStack {
-                // Gradient background
-                LinearGradient(
-                    colors: [
-                        Color(red: 0.1, green: 0.1, blue: 0.2),
-                        Color(red: 0.05, green: 0.05, blue: 0.15)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .ignoresSafeArea()
-                .onTapGesture {
-                    // Dismiss keyboard when tapping background
-                    isInputFocused = false
-                }
-                
-                VStack(spacing: 0) {
-                    // Navigation bar
-                    CenteredNavigationBar(
-                        onMenuTap: { showConversationList = true }
+            GeometryReader { geometry in
+                ZStack {
+                    // Background gradient
+                    LinearGradient(
+                        colors: [
+                            Color(red: 0.1, green: 0.1, blue: 0.2),
+                            Color(red: 0.05, green: 0.05, blue: 0.15)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
                     )
-                    
-                    // Messages scroll view with better performance
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(spacing: 16) {
-                                ForEach(chatManager.currentConversation?.messages ?? []) { message in
-                                    MessageBubbleView(message: message)
-                                        .id(message.id)
-                                        .transition(.asymmetric(
-                                            insertion: .opacity.combined(with: .slide),
-                                            removal: .opacity
-                                        ))
-                                }
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            .padding(.bottom, keyboardHeight > 0 ? keyboardHeight + 60 : 16)
-                        }
-                        .scrollDismissesKeyboard(.interactively) // iOS 16+ feature
-                        .onChange(of: chatManager.currentConversation?.messages.count) { _ in
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo(chatManager.currentConversation?.messages.last?.id, anchor: .bottom)
-                            }
-                        }
-                        .onChange(of: keyboardHeight) { _ in
-                            if let lastMessage = chatManager.currentConversation?.messages.last {
-                                withAnimation(.easeOut(duration: 0.25)) {
-                                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
-                                }
-                            }
-                        }
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        isInputFocused = false
                     }
                     
-                    // Input area
-                    InputArea(
-                        messageText: $messageText,
-                        textEditorHeight: $textEditorHeight,
-                        isInputFocused: _isInputFocused,
-                        onSend: {
-                            let trimmedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-                            if !trimmedText.isEmpty {
-                                chatManager.sendMessage(trimmedText)
-                                messageText = ""
-                                textEditorHeight = 44
+                    VStack(spacing: 0) {
+                        // Navigation bar
+                        CenteredNavigationBar(
+                            onMenuTap: { showConversationList = true }
+                        )
+                        
+                        // Messages scroll view
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(spacing: 16) {
+                                    ForEach(chatManager.currentConversation?.messages ?? []) { message in
+                                        MessageBubbleView(message: message)
+                                            .id(message.id)
+                                    }
+                                }
+                                .padding(.horizontal)
+                                .padding(.top, 8)
+                                .padding(.bottom, 20)
                             }
-                        },
-                        onConversationTap: {
-                            showConversationList = true
-                        },
-                        onVoiceTap: {
-                            showRealTimeChat = true
+                            .onChange(of: chatManager.currentConversation?.messages.count) { _ in
+                                withAnimation(.easeOut(duration: 0.3)) {
+                                    proxy.scrollTo(chatManager.currentConversation?.messages.last?.id, anchor: .bottom)
+                                }
+                            }
+                            .onChange(of: keyboardHeight) { _ in
+                                                           // Scroll to bottom when keyboard appears
+                                                           if let lastMessage = chatManager.currentConversation?.messages.last {
+                                                               withAnimation(.easeOut(duration: 0.3)) {
+                                                                   proxy.scrollTo(lastMessage.id, anchor: .bottom)
+                                                               }
+                                                           }
+                                                       }
                         }
-                    )
-                    .offset(y: -keyboardHeight)
+                        
+                        // Spacer to push input area to bottom
+                        Spacer(minLength: 0)
+                        
+                        // Input area
+                        InputArea(
+                            messageText: $messageText,
+                            textEditorHeight: $textEditorHeight,
+                            isInputFocused: _isInputFocused,
+                            onSend: {
+                                let trimmedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+                                if !trimmedText.isEmpty {
+                                    chatManager.sendMessage(trimmedText)
+                                    messageText = ""
+                                    textEditorHeight = 44
+                                }
+                            },
+                            onConversationTap: {
+                                showConversationList = true
+                            },
+                            onVoiceTap: {
+                                showRealTimeChat = true
+                            }
+                        )
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .padding(.bottom, keyboardHeight)
                     .animation(.easeOut(duration: 0.25), value: keyboardHeight)
                 }
             }
@@ -109,11 +127,14 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
                 if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                    keyboardHeight = keyboardFrame.height - 34 // Account for safe area
+                    let keyboardHeight = keyboardFrame.height
+                    self.keyboardHeight = keyboardHeight
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                keyboardHeight = 0
+                withAnimation(.easeOut(duration: 0.25)) {
+                                   keyboardHeight = 0
+                               }
             }
         }
     }
@@ -553,39 +574,21 @@ struct AnimatedBorderInput: View {
     @FocusState var isFocused: Bool
     
     @State private var rotation = 0.0
-    @State private var textHeight: CGFloat = 44
     
     var body: some View {
         ZStack(alignment: .leading) {
-            // Height measurement
-//            Text(text.isEmpty ? "Message" : text)
-//                .font(.system(size: 17))
-//                .foregroundColor(.clear)
-//                .padding(.horizontal, 20)
-//                .padding(.vertical, 12)
-//                .background(GeometryReader { geometry in
-//                    Color.clear.preference(
-//                        key: ViewHeightKey.self,
-//                        value: geometry.size.height
-//                    )
-//                })
-            
+            // Background
             RoundedRectangle(cornerRadius: 25, style: .continuous)
-                           .fill(.ultraThickMaterial)
-                           .frame(height: height)
+                .fill(.ultraThickMaterial)
             
-            // Text editor
+            // Text editor with dynamic height
             TextEditor(text: $text)
                 .font(.system(size: 17))
                 .padding(.horizontal, 12)
-                .padding(.vertical, 4)
+                .padding(.vertical, 8)
                 .focused($isFocused)
-                .frame(height: min(height, 250))
                 .scrollContentBackground(.hidden)
-                .background {
-                    RoundedRectangle(cornerRadius: 25, style: .continuous)
-                        .fill(.ultraThickMaterial)
-                }
+                .background(Color.clear)
                 .overlay {
                     RoundedRectangle(cornerRadius: 25, style: .continuous)
                         .stroke(
@@ -609,12 +612,28 @@ struct AnimatedBorderInput: View {
                     .padding(.horizontal, 20)
                     .allowsHitTesting(false)
             }
+            
+            // Invisible text view for height calculation
+            Text(text.isEmpty ? " " : text)
+                .font(.system(size: 17))
+                .foregroundColor(.clear)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 8)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: ViewHeightKey.self,
+                        value: geometry.size.height
+                    )
+                })
         }
-//        .onPreferenceChange(ViewHeightKey.self) { newHeight in
-//            height = max(44, min(newHeight, 250))
-//        }
         .frame(height: height)
-        .onAppear {
+        .onPreferenceChange(ViewHeightKey.self) { newHeight in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                height = max(44, min(newHeight, 120)) // Limit max height
+            }
+        }
+        .onChange(of: text) { _ in
             calculateHeight()
         }
         .onChange(of: isFocused) { newValue in
@@ -629,23 +648,10 @@ struct AnimatedBorderInput: View {
     }
     
     private func calculateHeight() {
-          let font = UIFont.systemFont(ofSize: 17)
-          let textWidth = UIScreen.main.bounds.width - 120 // Account for padding and buttons
-          
-          let size = text.boundingRect(
-              with: CGSize(width: textWidth, height: .infinity),
-              options: [.usesLineFragmentOrigin, .usesFontLeading],
-              attributes: [.font: font],
-              context: nil
-          )
-          
-          let newHeight = max(44, min(size.height + 24, 250)) // Add padding
-          
-          withAnimation(.easeInOut(duration: 0.1)) {
-              height = newHeight
-          }
-      }
+        // Height will be calculated automatically by the GeometryReader
+    }
 }
+
 
 // Radial Animated Background
 struct RadialAnimatedBackground: View {
@@ -778,23 +784,23 @@ struct ChatView: View {
             }
             
             //  input area
-            MessageInputView(
-                messageText: $messageText,
-                textEditorHeight: $textEditorHeight,
-                isInputFocused: _isInputFocused,
-                onSend: {
-                    let trimmedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-                    if !trimmedText.isEmpty {
-                        chatManager.sendMessage(trimmedText)
-                        messageText = ""
-                        textEditorHeight = 44
-                    }
-                }
-            )
+//            MessageInputView(
+//                messageText: $messageText,
+//                textEditorHeight: $textEditorHeight,
+//                isInputFocused: _isInputFocused,
+//                onSend: {
+//                    let trimmedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+//                    if !trimmedText.isEmpty {
+//                        chatManager.sendMessage(trimmedText)
+//                        messageText = ""
+//                        textEditorHeight = 44
+//                    }
+//                }
+//            )
         }
         .background(Color.black.opacity(0.95))
         .onTapGesture {
-            isInputFocused = false
+            isInputFocused = true
         }
     }
 }
@@ -805,39 +811,95 @@ struct MessageInputView: View {
     @Binding var textEditorHeight: CGFloat
     @FocusState var isInputFocused: Bool
     let onSend: () -> Void
+    let onConversationTap: () -> Void
+    let onVoiceTap: () -> Void
+    
+    
     
     var body: some View {
-        HStack(alignment: .bottom, spacing: 12) {
-            InputField(
-                text: $messageText,
-                height: $textEditorHeight,
-                isFocused: _isInputFocused,
-                placeholder: "Message"
-            )
-            
-            AnimatedSendButton(
-                isEnabled: !messageText.isEmpty,
-                action: onSend
-            )
-            .offset(y: -4)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background {
-            Rectangle()
-                .fill(.ultraThickMaterial)
-                .overlay {
-                    Rectangle()
-                        .fill(Gradients.glass)
-                        .frame(height: 1)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                }
-        }
-    }
+          VStack(spacing: 0) {
+              Rectangle()
+                  .fill(Color.gray.opacity(0.3))
+                  .frame(height: 1)
+              
+              HStack(alignment: .bottom, spacing: 8) {
+                  AnimatedBorderInput(
+                      text: $messageText,
+                      height: $textEditorHeight,
+                      isFocused: _isInputFocused
+                  )
+                  
+                  HStack(spacing: 8) {
+                      WeightedButton(
+                          icon: "bubble.left.bubble.right",
+                          action: onConversationTap,
+                          gradient: LinearGradient(
+                              colors: [.blue, .purple],
+                              startPoint: .topLeading,
+                              endPoint: .bottomTrailing
+                          )
+                      )
+                      
+                      AnimatedSendButton(
+                          isEnabled: !messageText.isEmpty,
+                          action: onSend
+                      )
+                      
+                      WeightedButton(
+                          icon: "mic.fill",
+                          action: onVoiceTap,
+                          gradient: LinearGradient(
+                              colors: [.purple, .pink],
+                              startPoint: .topLeading,
+                              endPoint: .bottomTrailing
+                          )
+                      )
+                  }
+              }
+              .padding(.horizontal, 16)
+              .padding(.vertical, 12)
+              .background {
+                  Rectangle()
+                      .fill(.ultraThickMaterial)
+              }
+          }
+      }
+    
+    // Add keyboard dismiss toolbar
+
+
+//    var body: some View {
+//        HStack(alignment: .bottom, spacing: 12) {
+//            InputField(
+//                text: $messageText,
+//                height: $textEditorHeight,
+//                isFocused: _isInputFocused,
+//                placeholder: "Message"
+//            )
+//            
+//            AnimatedSendButton(
+//                isEnabled: !messageText.isEmpty,
+//                action: onSend
+//            )
+//            .offset(y: -4)
+//        }
+//        .padding(.horizontal, 16)
+//        .padding(.vertical, 12)
+//        .background {
+//            Rectangle()
+//                .fill(.ultraThickMaterial)
+//                .overlay {
+//                    Rectangle()
+//                        .fill(Gradients.glass)
+//                        .frame(height: 1)
+//                        .frame(maxHeight: .infinity, alignment: .top)
+//                }
+//        }
+//    }
 }
 
 
-#Preview {
-    ContentView(chatManager: ChatManager())
-    .preferredColorScheme(.dark)
-}
+//#Preview {
+//    ContentView(chatManager: ChatManager())
+//    .preferredColorScheme(.dark)
+//}

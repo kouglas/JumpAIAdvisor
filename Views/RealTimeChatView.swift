@@ -8,13 +8,12 @@
 import SwiftUI
 import AVFoundation
 
-import SwiftUI
-
 struct RealTimeChatView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var audioManager = AudioManager()
     @State private var visualizationState: VisualizationState = .idle
     @State private var audioLevel: CGFloat = 0.0
+    @State private var hasAppeared = false
     
     enum VisualizationState {
         case idle
@@ -27,12 +26,12 @@ struct RealTimeChatView: View {
             // Dark background
             Color.black.ignoresSafeArea()
             
-            
             // Center visualization based on state
             GeometryReader { geometry in
                 VStack {
                     Spacer()
                     
+                    // Visualization content
                     Group {
                         switch visualizationState {
                         case .idle:
@@ -79,20 +78,41 @@ struct RealTimeChatView: View {
                 
                 Spacer()
             }
-            if !audioManager.transcribedText.isEmpty {
-                          VStack {
-                              Spacer()
-                              Text("Heard: \(audioManager.transcribedText)")
-                                  .foregroundColor(.white)
-                                  .padding()
-                                  .background(Color.black.opacity(0.7))
-                                  .cornerRadius(10)
-                                  .padding(.bottom, 150)
-                          }
-                      }
+            
+            // Debug information overlay
+            VStack {
+                Spacer()
+                VStack(spacing: 8) {
+                    if audioManager.hasPermission {
+                        Text("Permissions: ✅")
+                    } else {
+                        Text("Permissions: ❌")
+                    }
+                    if audioManager.isListening {
+                        Text("Listening: ✅")
+                    } else {
+                        Text("Listening: ❌")
+                    }
+                    if !audioManager.transcribedText.isEmpty {
+                        Text("Heard: \(audioManager.transcribedText)")
+                    }
+                    if let error = audioManager.errorMessage {
+                        Text("Error: \(error)")
+                            .foregroundColor(.red)
+                    }
+                }
+                .foregroundColor(.white)
+                .padding()
+                .background(Color.black.opacity(0.7))
+                .cornerRadius(10)
+                .padding(.bottom, 150)
+            }
         }
         .onAppear {
-            setupAudioManager()
+            if !hasAppeared {
+                hasAppeared = true
+                setupAudioManager()
+            }
         }
     }
     
@@ -108,6 +128,8 @@ struct RealTimeChatView: View {
     }
     
     private func setupAudioManager() {
+        print("🚀 Setting up audio manager...")
+        
         audioManager.delegate = AudioDelegate(
             onStartListening: {
                 withAnimation(.spring()) {
@@ -133,7 +155,14 @@ struct RealTimeChatView: View {
             }
         )
         
-        // Simulate audio level changes when speaking
+        // Request permissions and start listening
+        if audioManager.hasPermission {
+            audioManager.startListening()
+        } else {
+            audioManager.requestMicrophonePermission()
+        }
+        
+        // Start audio level animation for speaking state
         Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
             if visualizationState == .speaking {
                 withAnimation(.easeInOut(duration: 0.1)) {
@@ -141,8 +170,6 @@ struct RealTimeChatView: View {
                 }
             }
         }
-        
-        audioManager.requestMicrophonePermission()
     }
 }
 
@@ -293,11 +320,137 @@ struct ListeningOrbitingBall: View {
             ),
             lineWidth: thickness * 2
         )
-//        .blendMode(.plusLighter)
     }
 }
 
-
+// Speaking state: Horizontal waveform equalizer
+struct SpeakingWaveform: View {
+    let audioLevel: CGFloat
+    
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            Canvas { context, size in
+                let width = size.width
+                let height: CGFloat = 100
+                let centerY = size.height / 2
+                
+                // Create waveform path
+                let path = createWaveformPath(
+                    width: width,
+                    height: height,
+                    centerY: centerY,
+                    time: timeline.date.timeIntervalSinceReferenceDate,
+                    audioLevel: audioLevel
+                )
+                
+                // Draw main waveform
+                drawMainWaveform(context: context, path: path, centerY: centerY, width: width)
+                
+                // Add glow effect
+                drawGlowEffect(context: context, path: path, centerY: centerY, width: width)
+                
+                // Add edge anchors
+                drawEdgeAnchors(context: context, centerY: centerY, width: width)
+            }
+        }
+    }
+    
+    private func createWaveformPath(width: CGFloat, height: CGFloat, centerY: CGFloat, time: TimeInterval, audioLevel: CGFloat) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 0, y: centerY))
+        
+        for x in stride(from: 0, through: width, by: 2) {
+            let waveY = calculateWaveY(
+                x: x,
+                width: width,
+                height: height,
+                centerY: centerY,
+                time: time,
+                audioLevel: audioLevel
+            )
+            path.addLine(to: CGPoint(x: x, y: waveY))
+        }
+        
+        return path
+    }
+    
+    private func calculateWaveY(x: CGFloat, width: CGFloat, height: CGFloat, centerY: CGFloat, time: TimeInterval, audioLevel: CGFloat) -> CGFloat {
+        let progress = x / width
+        
+        // Combine multiple frequencies for complex waveform
+        let wave1 = sin(progress * .pi * 8 + time * 3) * audioLevel
+        let wave2 = sin(progress * .pi * 4 + time * 2) * audioLevel * 0.5
+        let wave3 = sin(progress * .pi * 12 + time * 4) * audioLevel * 0.3
+        
+        let combinedWave = (wave1 + wave2 + wave3) * height * 0.3
+        
+        return centerY + combinedWave
+    }
+    
+    private func drawMainWaveform(context: GraphicsContext, path: Path, centerY: CGFloat, width: CGFloat) {
+        let gradient = Gradient(colors: [.blue, .purple, .pink, .orange])
+        let startPoint = CGPoint(x: 0, y: centerY)
+        let endPoint = CGPoint(x: width, y: centerY)
+        
+        context.stroke(
+            path,
+            with: .linearGradient(gradient, startPoint: startPoint, endPoint: endPoint),
+            lineWidth: 3
+        )
+    }
+    
+    private func drawGlowEffect(context: GraphicsContext, path: Path, centerY: CGFloat, width: CGFloat) {
+        let glowColors: [Color] = [
+            .blue.opacity(0.3),
+            .purple.opacity(0.3),
+            .pink.opacity(0.3),
+            .orange.opacity(0.3)
+        ]
+        
+        let gradient = Gradient(colors: glowColors)
+        let startPoint = CGPoint(x: 0, y: centerY)
+        let endPoint = CGPoint(x: width, y: centerY)
+        
+        var glowContext = context
+        glowContext.blendMode = .plusLighter
+        
+        glowContext.stroke(
+            path,
+            with: .linearGradient(gradient, startPoint: startPoint, endPoint: endPoint),
+            lineWidth: 8
+        )
+    }
+    
+    private func drawEdgeAnchors(context: GraphicsContext, centerY: CGFloat, width: CGFloat) {
+        let anchorRadius: CGFloat = 8
+        
+        // Left anchor
+        let leftAnchorRect = CGRect(
+            x: -anchorRadius,
+            y: centerY - anchorRadius,
+            width: anchorRadius * 2,
+            height: anchorRadius * 2
+        )
+        
+        context.fill(
+            Circle().path(in: leftAnchorRect),
+            with: .color(.blue)
+        )
+        
+        // Right anchor
+        let rightAnchorRect = CGRect(
+            x: width - anchorRadius,
+            y: centerY - anchorRadius,
+            width: anchorRadius * 2,
+            height: anchorRadius * 2
+        )
+        
+        context.fill(
+            Circle().path(in: rightAnchorRect),
+            with: .color(.orange)
+        )
+    }
+}
 
 // Preference key for scroll detection
 struct ScrollOffsetPreferenceKey: PreferenceKey {

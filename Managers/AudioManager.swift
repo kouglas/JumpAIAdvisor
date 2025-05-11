@@ -40,8 +40,11 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     func requestMicrophonePermission() {
+        print("🎤 Requesting microphone permissions...")
+        
         SFSpeechRecognizer.requestAuthorization { [weak self] authStatus in
             DispatchQueue.main.async {
+                print("🎤 Speech recognition auth status: \(authStatus)")
                 switch authStatus {
                 case .authorized:
                     self?.checkMicrophonePermission()
@@ -60,10 +63,10 @@ class AudioManager: NSObject, ObservableObject {
     private func checkMicrophonePermission() {
         AVAudioSession.sharedInstance().requestRecordPermission { [weak self] granted in
             DispatchQueue.main.async {
+                print("🎤 Microphone permission: \(granted)")
                 self?.hasPermission = granted
                 if granted {
                     self?.setupAudioSession()
-                    self?.startListening()
                 } else {
                     self?.showPermissionAlert = true
                 }
@@ -74,32 +77,47 @@ class AudioManager: NSObject, ObservableObject {
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try audioSession.setCategory(.record, mode: .spokenAudio, options: [.defaultToSpeaker])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-            startListening()
+            print("✅ Audio session configured successfully")
         } catch {
             errorMessage = "Failed to setup audio session: \(error.localizedDescription)"
-            print("Audio session error: \(error)")
+            print("❌ Audio session error: \(error)")
         }
     }
     
     func startListening() {
-        guard hasPermission, !isListening else { return }
+        print("🎤 Starting to listen...")
+        guard hasPermission else {
+            print("❌ No permission to start listening")
+            requestMicrophonePermission()
+            return
+        }
+        
+        guard !isListening else {
+            print("⚠️ Already listening")
+            return
+        }
         
         do {
-            
-            // Reset audio engine
+            // Clean up any existing session
             if audioEngine.isRunning {
                 audioEngine.stop()
                 audioEngine.inputNode.removeTap(onBus: 0)
-                recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             }
+            
+            // Configure audio session for recording
+            try AVAudioSession.sharedInstance().setCategory(.record, mode: .spokenAudio)
+            try AVAudioSession.sharedInstance().setActive(true)
+            
+            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             
             guard let recognitionRequest = recognitionRequest else {
                 throw NSError(domain: "AudioManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"])
             }
             
             recognitionRequest.shouldReportPartialResults = true
+            recognitionRequest.requiresOnDeviceRecognition = false
             
             let inputNode = audioEngine.inputNode
             let recordingFormat = inputNode.outputFormat(forBus: 0)
@@ -113,30 +131,36 @@ class AudioManager: NSObject, ObservableObject {
             
             isListening = true
             delegate?.onStartListening()
+            print("✅ Listening started successfully")
             
             recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
                 if let result = result {
                     let transcription = result.bestTranscription.formattedString
+                    print("🗣️ Heard: \(transcription)")
+                    self?.transcribedText = transcription
                     
                     if result.isFinal {
+                        print("🏁 Recognition final")
                         self?.stopListening()
                         self?.processTranscription(transcription)
                     }
                 }
                 
                 if let error = error {
+                    print("❌ Recognition error: \(error)")
                     self?.stopListening()
                     self?.errorMessage = "Recognition error: \(error.localizedDescription)"
                 }
             }
         } catch {
+            print("❌ Failed to start listening: \(error)")
             stopListening()
             errorMessage = "Failed to start listening: \(error.localizedDescription)"
         }
     }
     
     func stopListening() {
-        guard isListening else { return }
+        print("🛑 Stopping listening...")
         
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
@@ -147,10 +171,11 @@ class AudioManager: NSObject, ObservableObject {
         isListening = false
         
         delegate?.onStopListening()
+        print("✅ Listening stopped")
     }
     
     private func processTranscription(_ text: String) {
-        // Process with OpenAI
+        print("🔄 Processing transcription: \(text)")
         HapticFeedback.impact()
         
         let openAIService = OpenAIService()
@@ -159,8 +184,10 @@ class AudioManager: NSObject, ObservableObject {
         openAIService.getChatCompletion(messages: [userMessage]) { [weak self] result in
             switch result {
             case .success(let response):
+                print("✅ Got AI response: \(response)")
                 self?.speakResponse(response)
             case .failure(let error):
+                print("❌ AI error: \(error)")
                 self?.errorMessage = error.localizedDescription
                 self?.speakResponse("I'm sorry, I encountered an error. Please try again.")
             }
@@ -168,6 +195,8 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     private func speakResponse(_ text: String) {
+        print("🔊 Speaking response: \(text)")
+        
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = 0.5
         utterance.pitchMultiplier = 1.0

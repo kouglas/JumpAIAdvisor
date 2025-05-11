@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - ViewHeightKey PreferenceKey
 struct ViewHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static var defaultValue: CGFloat = 44
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }

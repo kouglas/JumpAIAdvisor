@@ -32,6 +32,8 @@ class ChatManager: ObservableObject {
         currentConversation = conversation
     }
     
+    // In ChatManager.swift, fix the streaming logic:
+
     func sendMessage(_ content: String) {
         print("🔍 Debug: Sending message: \(content)")
         
@@ -67,15 +69,17 @@ class ChatManager: ObservableObject {
                 guard let self = self else { return }
                 
                 if self.streamingContent.isEmpty {
-                    HapticFeedback.tick()
-                    
+                    // First token - replace thinking message with AI message
                     if var updatedConversation = self.currentConversation {
                         updatedConversation.messages.removeAll { $0.isThinking }
+                        
+                        // Create AI message with first token
                         let aiMessage = Message(content: token, isUser: false)
                         updatedConversation.messages.append(aiMessage)
                         self.updateConversation(updatedConversation)
                     }
                 } else {
+                    // Subsequent tokens - append to existing message
                     if var updatedConversation = self.currentConversation,
                        let lastIndex = updatedConversation.messages.lastIndex(where: { !$0.isUser && !$0.isThinking }) {
                         var message = updatedConversation.messages[lastIndex]
@@ -99,11 +103,10 @@ class ChatManager: ObservableObject {
                 self.isLoading = false
                 self.errorMessage = error.localizedDescription
                 
-                // Remove thinking message on error
+                // Remove thinking message and add error message
                 if var updatedConversation = self.currentConversation {
                     updatedConversation.messages.removeAll { $0.isThinking }
                     
-                    // Add error message
                     let errorMessage = Message(
                         content: "Error: \(error.localizedDescription)",
                         isUser: false

@@ -6,117 +6,142 @@
 //
 
 import SwiftUI
+import AVFAudio
+import AVFoundation
 
 struct ContentView: View {
     @ObservedObject var chatManager: ChatManager
-        @State private var messageText = ""
-        @State private var textEditorHeight: CGFloat = 44
-        @FocusState private var isInputFocused: Bool
-        @State private var showConversationList = false
-        @State private var showRealTimeChat = false
-//        @State private var keyboardHeight: CGFloat = 0
-        
-        var body: some View {
-            NavigationStack {
-                ZStack {
-                    // Radial animated background
-//                    RadialAnimatedBackground()
-                    LinearGradient(
-                                       colors: [
-                                           Color(red: 0.1, green: 0.1, blue: 0.2),
-                                           Color(red: 0.05, green: 0.05, blue: 0.15)
-                                       ],
-                                       startPoint: .top,
-                                       endPoint: .bottom
-                                   )
-                                   .ignoresSafeArea()
+    @State private var messageText = ""
+    @State private var textEditorHeight: CGFloat = 44
+    @FocusState private var isInputFocused: Bool
+    @State private var showConversationList = false
+    @State private var showRealTimeChat = false
+    @State private var keyboardHeight: CGFloat = 0
+    
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                // Gradient background
+                LinearGradient(
+                    colors: [
+                        Color(red: 0.1, green: 0.1, blue: 0.2),
+                        Color(red: 0.05, green: 0.05, blue: 0.15)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+                .onTapGesture {
+                    // Dismiss keyboard when tapping background
+                    isInputFocused = false
+                }
+                
+                VStack(spacing: 0) {
+                    // Navigation bar
+                    CenteredNavigationBar(
+                        onMenuTap: { showConversationList = true }
+                    )
                     
-                    VStack(spacing: 0) {
-                        // Centered navigation bar
-                        CenteredNavigationBar(
-                            onMenuTap: { showConversationList = true }
-                        )
-                        
-                        // Chat messages in scroll view
-                        ScrollViewReader { proxy in
-                            ScrollView {
-                                LazyVStack(spacing: 16) {
-                                    ForEach(chatManager.currentConversation?.messages ?? []) { message in
-                                        MessageBubbleView(message: message)
-                                            .id(message.id)
-                                    }
+                    // Messages scroll view with better performance
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            LazyVStack(spacing: 16) {
+                                ForEach(chatManager.currentConversation?.messages ?? []) { message in
+                                    MessageBubbleView(message: message)
+                                        .id(message.id)
+                                        .transition(.asymmetric(
+                                            insertion: .opacity.combined(with: .slide),
+                                            removal: .opacity
+                                        ))
                                 }
-                                .padding(.horizontal)
-                                .padding(.top, 8)
-                                .padding(.bottom, 16)
                             }
-                            .onChange(of: chatManager.currentConversation?.messages.count) { _ in
-                                withAnimation(.spring(response: 0.3)) {
-                                    proxy.scrollTo(chatManager.currentConversation?.messages.last?.id, anchor: .bottom)
+                            .padding(.horizontal)
+                            .padding(.top, 8)
+                            .padding(.bottom, keyboardHeight > 0 ? keyboardHeight + 60 : 16)
+                        }
+                        .scrollDismissesKeyboard(.interactively) // iOS 16+ feature
+                        .onChange(of: chatManager.currentConversation?.messages.count) { _ in
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                proxy.scrollTo(chatManager.currentConversation?.messages.last?.id, anchor: .bottom)
+                            }
+                        }
+                        .onChange(of: keyboardHeight) { _ in
+                            if let lastMessage = chatManager.currentConversation?.messages.last {
+                                withAnimation(.easeOut(duration: 0.25)) {
+                                    proxy.scrollTo(lastMessage.id, anchor: .bottom)
                                 }
                             }
                         }
-                        
-                        // Input area with all buttons
-                        InputArea(
-                            messageText: $messageText,
-                            textEditorHeight: $textEditorHeight,
-                            isInputFocused: _isInputFocused,
-                            onSend: {
-                                let trimmedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
-                                if !trimmedText.isEmpty {
-                                    chatManager.sendMessage(trimmedText)
-                                    messageText = ""
-                                    textEditorHeight = 44
-                                    isInputFocused = false
-                                }
-                            },
-                            onConversationTap: {
-                                showConversationList = true
-                            },
-                            onVoiceTap: {
-                                showRealTimeChat = true
+                    }
+                    
+                    // Input area
+                    InputArea(
+                        messageText: $messageText,
+                        textEditorHeight: $textEditorHeight,
+                        isInputFocused: _isInputFocused,
+                        onSend: {
+                            let trimmedText = messageText.trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !trimmedText.isEmpty {
+                                chatManager.sendMessage(trimmedText)
+                                messageText = ""
+                                textEditorHeight = 44
                             }
-                        )
-                        .background(Color.clear) // Ensure background doesn't interfere
-                    }
-                }
-                .navigationBarHidden(true)
-                .ignoresSafeArea(.keyboard) // Important: Don't let keyboard push everything up
-                .sheet(isPresented: $showConversationList) {
-                    ConversationListView(chatManager: chatManager)
-                        .presentationDragIndicator(.visible)
-                        .presentationCornerRadius(30)
-                }
-                .fullScreenCover(isPresented: $showRealTimeChat) {
-                    RealTimeChatView()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
-                    if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                        withAnimation(.easeOut(duration: 0.25)) {
-//                            keyboardHeight = keyboardFrame.height
+                        },
+                        onConversationTap: {
+                            showConversationList = true
+                        },
+                        onVoiceTap: {
+                            showRealTimeChat = true
                         }
-                    }
+                    )
+                    .offset(y: -keyboardHeight)
+                    .animation(.easeOut(duration: 0.25), value: keyboardHeight)
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                    withAnimation(.easeOut(duration: 0.25)) {
-//                        keyboardHeight = 0
-                    }
+            }
+            .navigationBarHidden(true)
+            .sheet(isPresented: $showConversationList) {
+                ConversationListView(chatManager: chatManager)
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(30)
+            }
+            .fullScreenCover(isPresented: $showRealTimeChat) {
+                RealTimeChatView()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
+                if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    keyboardHeight = keyboardFrame.height - 34 // Account for safe area
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                keyboardHeight = 0
             }
         }
     }
+}
 
 
 struct MessageBubbleView: View {
     let message: Message
     @State private var displayedText = ""
     @State private var isTyping = false
+    @State private var isPlaying = false
+    @State private var speechSynthesizer: AVSpeechSynthesizer?
+    @State private var appeared = false
+    
+    // Custom gradient for user messages
+    private let userGradient = LinearGradient(
+        gradient: Gradient(stops: [
+            .init(color: Color(red: 0.07, green: 0.71, blue: 0.14), location: 0), // #11b424
+            .init(color: Color(red: 0.10, green: 0.53, blue: 0.77), location: 1)  // #1a86c4
+        ]),
+        startPoint: .leading,
+        endPoint: .trailing
+    )
     
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             if !message.isUser {
-                // AI Avatar with proper spacing
+                // AI Avatar
                 Circle()
                     .fill(
                         RadialGradient(
@@ -131,15 +156,20 @@ struct MessageBubbleView: View {
                         Image(systemName: "brain")
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
+                            .symbolEffect(.pulse, value: isTyping)
                     }
-                    .padding(.leading, 16) // Add left padding
+                    .padding(.leading, 8) // Reduced padding
             } else {
                 Spacer()
             }
             
             VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
-                // Message bubble
-                if message.content.contains("Error:") {
+                // Don't show empty bubbles
+                if !message.isThinking && (message.content.isEmpty && displayedText.isEmpty) {
+                    EmptyView()
+                } else if message.isThinking {
+                    ThinkingIndicator()
+                } else if message.content.contains("Error:") {
                     // Error message styling
                     Text(message.content)
                         .font(.system(size: 16))
@@ -151,20 +181,22 @@ struct MessageBubbleView: View {
                                 .fill(Color.red.opacity(0.8))
                         }
                 } else {
-                    // Normal message
-                    Text(displayedText.isEmpty ? message.content : displayedText)
+                    // Normal message with typing animation
+                    Text(displayedText.isEmpty && message.isUser ? message.content : displayedText)
                         .font(.system(size: 16))
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
                         .padding(.vertical, 12)
                         .background {
                             RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                .fill(message.isUser ? Color.blue : Color.gray.opacity(0.3))
+                                .fill(message.isUser ? AnyShapeStyle(userGradient) : AnyShapeStyle(Color.gray.opacity(0.3)))
                         }
+                        .opacity(appeared ? 1 : 0)
+                        .animation(.easeIn(duration: 0.3), value: appeared)
                 }
                 
                 // Action buttons for AI messages
-                if !message.isUser && !message.content.isEmpty && !message.content.contains("Error:") {
+                if !message.isUser && !message.content.isEmpty && !message.content.contains("Error:") && !isTyping {
                     HStack(spacing: 16) {
                         Button(action: {
                             UIPasteboard.general.string = message.content
@@ -176,20 +208,22 @@ struct MessageBubbleView: View {
                         }
                         
                         Button(action: {
-                            // Play action
+                            toggleSpeech()
                         }) {
-                            Label("Play", systemImage: "play.circle")
+                            Label(isPlaying ? "Stop" : "Play", systemImage: isPlaying ? "stop.circle" : "play.circle")
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
                     }
                     .padding(.leading, 16)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3).delay(0.2), value: appeared)
                 }
             }
             .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.isUser ? .trailing : .leading)
             
             if message.isUser {
-                // User Avatar with proper spacing
+                // User Avatar
                 Circle()
                     .fill(
                         RadialGradient(
@@ -205,24 +239,118 @@ struct MessageBubbleView: View {
                             .font(.system(size: 20, weight: .bold))
                             .foregroundColor(.white)
                     }
-                    .padding(.trailing, 16) // Add right padding
+                    .padding(.trailing, 8) // Reduced padding
             } else {
                 Spacer()
             }
         }
         .onAppear {
+            appeared = true
+            
             // Start typing animation for AI messages
-            if !message.isUser && displayedText.isEmpty && !message.content.contains("Error:") {
+            if !message.isUser && !message.isThinking && !message.content.isEmpty && displayedText.isEmpty {
                 startTypingAnimation()
-            } else {
+            } else if message.isUser {
                 displayedText = message.content
             }
+        }
+        .onDisappear {
+            // Clean up speech synthesizer
+            speechSynthesizer?.stopSpeaking(at: .immediate)
+            speechSynthesizer = nil
+            isPlaying = false
         }
     }
     
     private func startTypingAnimation() {
-        // Animation code here
-        displayedText = message.content // For now, show all at once
+        guard !message.content.isEmpty else { return }
+        
+        isTyping = true
+        displayedText = ""
+        var characterIndex = 0
+        
+        // Initial haptic
+        HapticFeedback.tick()
+        
+        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+            if characterIndex < message.content.count {
+                let index = message.content.index(message.content.startIndex, offsetBy: characterIndex)
+                displayedText.append(message.content[index])
+                characterIndex += 1
+                
+                // Haptic feedback for each character/token
+                if characterIndex % 5 == 0 { // Reduce haptic frequency
+                    HapticFeedback.tick()
+                }
+            } else {
+                timer.invalidate()
+                isTyping = false
+                // Final haptic
+                HapticFeedback.tick()
+            }
+        }
+    }
+    
+    private func toggleSpeech() {
+        if isPlaying {
+            speechSynthesizer?.stopSpeaking(at: .immediate)
+            isPlaying = false
+        } else {
+            let synthesizer = AVSpeechSynthesizer()
+            speechSynthesizer = synthesizer
+            
+            let utterance = AVSpeechUtterance(string: message.content)
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+            utterance.rate = 0.5
+            utterance.pitchMultiplier = 1.0
+            utterance.volume = 0.9
+            
+            // Set up completion handler
+            NotificationCenter.default.addObserver(
+                forName: .AVSpeechSynthesizerDidFinishSpeaking,
+                object: synthesizer,
+                queue: .main
+            ) { _ in
+                self.isPlaying = false
+            }
+            
+            synthesizer.speak(utterance)
+            isPlaying = true
+        }
+    }
+}
+
+extension NSNotification.Name {
+    static let AVSpeechSynthesizerDidFinishSpeaking = NSNotification.Name("AVSpeechSynthesizerDidFinishSpeaking")
+}
+struct ThinkingIndicator: View {
+    @State private var animationAmount = 0.0
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(Color.gray)
+                    .frame(width: 8, height: 8)
+                    .scaleEffect(animationAmount)
+                    .opacity(0.3 + 0.7 * animationAmount)
+                    .animation(
+                        .easeInOut(duration: 0.6)
+                        .repeatForever(autoreverses: true)
+                        .delay(Double(index) * 0.2),
+                        value: animationAmount
+                    )
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.gray.opacity(0.3))
+        )
+        .onAppear {
+            animationAmount = 1.0
+        }
     }
 }
 
@@ -659,7 +787,7 @@ struct MessageInputView: View {
 }
 
 
-//#Preview {
-//    ContentView(chatManager: ChatManager())
-//    .preferredColorScheme(.dark)
-//}
+#Preview {
+    ContentView(chatManager: ChatManager())
+    .preferredColorScheme(.dark)
+}

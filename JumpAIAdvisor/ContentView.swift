@@ -294,30 +294,53 @@ struct MessageBubbleView: View {
     private func toggleSpeech() {
         if isPlaying {
             speechSynthesizer?.stopSpeaking(at: .immediate)
+            speechSynthesizer = nil
             isPlaying = false
         } else {
+            // Create and configure synthesizer immediately
             let synthesizer = AVSpeechSynthesizer()
             speechSynthesizer = synthesizer
+            
+            // Configure audio session for immediate playback
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("Failed to set up audio session: \(error)")
+            }
             
             let utterance = AVSpeechUtterance(string: message.content)
             utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
             utterance.rate = 0.5
             utterance.pitchMultiplier = 1.0
             utterance.volume = 0.9
+            utterance.preUtteranceDelay = 0 // No delay before speaking
+            utterance.postUtteranceDelay = 0 // No delay after speaking
             
-            // Set up completion handler
-            NotificationCenter.default.addObserver(
-                forName: .AVSpeechSynthesizerDidFinishSpeaking,
-                object: synthesizer,
-                queue: .main
-            ) { _ in
-                self.isPlaying = false
-            }
+            // Use completion handler
+//            synthesizer?.delegate = SpeechDelegate {
+//                self.isPlaying = false
+//                self.speechSynthesizer = nil
+//            }
             
-            synthesizer.speak(utterance)
             isPlaying = true
+            synthesizer.speak(utterance)
         }
     }
+
+    // Add a speech delegate helper
+    private class SpeechDelegate: NSObject, AVSpeechSynthesizerDelegate {
+        private let completion: () -> Void
+        
+        init(completion: @escaping () -> Void) {
+            self.completion = completion
+        }
+        
+        func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
+            completion()
+        }
+    }
+
 }
 
 extension NSNotification.Name {
@@ -530,21 +553,26 @@ struct AnimatedBorderInput: View {
     @FocusState var isFocused: Bool
     
     @State private var rotation = 0.0
+    @State private var textHeight: CGFloat = 44
     
     var body: some View {
         ZStack(alignment: .leading) {
             // Height measurement
-            Text(text.isEmpty ? "Message" : text)
-                .font(.system(size: 17))
-                .foregroundColor(.clear)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(GeometryReader { geometry in
-                    Color.clear.preference(
-                        key: ViewHeightKey.self,
-                        value: geometry.size.height
-                    )
-                })
+//            Text(text.isEmpty ? "Message" : text)
+//                .font(.system(size: 17))
+//                .foregroundColor(.clear)
+//                .padding(.horizontal, 20)
+//                .padding(.vertical, 12)
+//                .background(GeometryReader { geometry in
+//                    Color.clear.preference(
+//                        key: ViewHeightKey.self,
+//                        value: geometry.size.height
+//                    )
+//                })
+            
+            RoundedRectangle(cornerRadius: 25, style: .continuous)
+                           .fill(.ultraThickMaterial)
+                           .frame(height: height)
             
             // Text editor
             TextEditor(text: $text)
@@ -582,8 +610,12 @@ struct AnimatedBorderInput: View {
                     .allowsHitTesting(false)
             }
         }
-        .onPreferenceChange(ViewHeightKey.self) { newHeight in
-            height = max(44, min(newHeight, 250))
+//        .onPreferenceChange(ViewHeightKey.self) { newHeight in
+//            height = max(44, min(newHeight, 250))
+//        }
+        .frame(height: height)
+        .onAppear {
+            calculateHeight()
         }
         .onChange(of: isFocused) { newValue in
             if newValue {
@@ -595,6 +627,24 @@ struct AnimatedBorderInput: View {
             }
         }
     }
+    
+    private func calculateHeight() {
+          let font = UIFont.systemFont(ofSize: 17)
+          let textWidth = UIScreen.main.bounds.width - 120 // Account for padding and buttons
+          
+          let size = text.boundingRect(
+              with: CGSize(width: textWidth, height: .infinity),
+              options: [.usesLineFragmentOrigin, .usesFontLeading],
+              attributes: [.font: font],
+              context: nil
+          )
+          
+          let newHeight = max(44, min(size.height + 24, 250)) // Add padding
+          
+          withAnimation(.easeInOut(duration: 0.1)) {
+              height = newHeight
+          }
+      }
 }
 
 // Radial Animated Background

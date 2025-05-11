@@ -27,6 +27,7 @@ struct RealTimeChatView: View {
             // Dark background
             Color.black.ignoresSafeArea()
             
+            
             // Center visualization based on state
             GeometryReader { geometry in
                 VStack {
@@ -78,6 +79,17 @@ struct RealTimeChatView: View {
                 
                 Spacer()
             }
+            if !audioManager.transcribedText.isEmpty {
+                          VStack {
+                              Spacer()
+                              Text("Heard: \(audioManager.transcribedText)")
+                                  .foregroundColor(.white)
+                                  .padding()
+                                  .background(Color.black.opacity(0.7))
+                                  .cornerRadius(10)
+                                  .padding(.bottom, 150)
+                          }
+                      }
         }
         .onAppear {
             setupAudioManager()

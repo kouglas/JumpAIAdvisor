@@ -24,6 +24,7 @@ class AudioManager: NSObject, ObservableObject {
     @Published var hasPermission = false
     @Published var showPermissionAlert = false
     @Published var errorMessage: String?
+    @Published var transcribedText: String = ""
     
     private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -75,8 +76,10 @@ class AudioManager: NSObject, ObservableObject {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+            startListening()
         } catch {
             errorMessage = "Failed to setup audio session: \(error.localizedDescription)"
+            print("Audio session error: \(error)")
         }
     }
     
@@ -84,7 +87,13 @@ class AudioManager: NSObject, ObservableObject {
         guard hasPermission, !isListening else { return }
         
         do {
-            recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+            
+            // Reset audio engine
+            if audioEngine.isRunning {
+                audioEngine.stop()
+                audioEngine.inputNode.removeTap(onBus: 0)
+                recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+            }
             
             guard let recognitionRequest = recognitionRequest else {
                 throw NSError(domain: "AudioManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Unable to create recognition request"])

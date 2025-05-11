@@ -9,7 +9,7 @@
 import Foundation
 
 struct Message: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     var content: String
     let isUser: Bool
     let timestamp: Date
@@ -24,7 +24,7 @@ struct Message: Identifiable, Codable {
 }
 
 struct Conversation: Identifiable, Codable {
-    let id = UUID()
+    var id = UUID()
     var title: String
     var messages: [Message]
     let createdAt: Date

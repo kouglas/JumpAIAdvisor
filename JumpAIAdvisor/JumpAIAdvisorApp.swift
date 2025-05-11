@@ -11,7 +11,7 @@ import SwiftUI
 struct JumpAIAdvisorApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(chatManager: ChatManager())
         }
     }
 }

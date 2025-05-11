@@ -1,7 +1,304 @@
 import SwiftUI
+import AVFoundation
 import AVFAudio
 
-// MARK: -  Gradient Definitions
+struct ScrollAwareMessageBubble: View {
+    let message: Message
+    @State private var appeared = false
+    @State private var isPlaying = false
+    @State private var speechSynthesizer = AVSpeechSynthesizer()
+    @State private var displayedText = ""
+    @State private var isTyping = false
+    @State private var scrollOffset: CGFloat = 0
+    
+    var body: some View {
+        GeometryReader { geometry in
+            HStack(alignment: .top, spacing: 12) {
+                if !message.isUser {
+                    // AI Avatar
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.purple.opacity(0.8), .blue],
+                                center: .center,
+                                startRadius: 1,
+                                endRadius: 16
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                        .overlay {
+                            Image(systemName: "brain")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                                .symbolEffect(.pulse, value: isTyping)
+                        }
+                        .shadow(color: .purple.opacity(0.4), radius: 8, y: 4)
+                }
+                
+                if message.isUser {
+                    Spacer(minLength: 50)
+                }
+                
+                VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
+                    if message.isThinking {
+                        EnhancedThinkingIndicator()
+                    } else {
+                        // Message content with typing animation and markdown
+                        RichMarkdownView(text: displayedText)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background {
+                                if message.isUser {
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [.blue, .blue.opacity(0.9)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
+                                } else {
+                                    // Gradient that shifts with scroll
+                                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                        .fill(.ultraThinMaterial)
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [
+                                                            Color.purple.opacity(0.15),
+                                                            Color.blue.opacity(0.1),
+                                                            Color.clear
+                                                        ],
+                                                        startPoint: UnitPoint(x: 0.5, y: scrollOffset * 0.001),
+                                                        endPoint: UnitPoint(x: 0.5, y: 1 + scrollOffset * 0.001)
+                                                    )
+                                                )
+                                        }
+                                        .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+                                }
+                            }
+                            .foregroundColor(message.isUser ? .white : .primary)
+                        
+                        // Action buttons
+                        if !message.isUser && !message.content.isEmpty && !isTyping {
+                            HStack(spacing: 16) {
+                                ActionButton(icon: "doc.on.clipboard.fill", title: "Copy") {
+                                    UIPasteboard.general.string = message.content
+                                    HapticFeedback.success()
+                                }
+                                
+                                ActionButton(
+                                    icon: isPlaying ? "stop.fill" : "play.fill",
+                                    title: isPlaying ? "Stop" : "Play"
+                                ) {
+                                    toggleSpeech()
+                                }
+                            }
+                            .padding(.top, 4)
+                            .transition(.opacity.combined(with: .slide))
+                        }
+                    }
+                }
+                
+                if !message.isUser {
+                    Spacer(minLength: 50)
+                }
+                
+                if message.isUser {
+                    // User Avatar
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.orange.opacity(0.8), .pink],
+                                center: .center,
+                                startRadius: 1,
+                                endRadius: 16
+                            )
+                        )
+                        .frame(width: 36, height: 36)
+                        .overlay {
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 20, weight: .bold))
+                                .foregroundColor(.white)
+                        }
+                        .shadow(color: .orange.opacity(0.4), radius: 8, y: 4)
+                }
+            }
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 20)
+            .onChange(of: geometry.frame(in: .global).minY) { newValue in
+                scrollOffset = newValue
+            }
+        }
+        .onAppear {
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                appeared = true
+            }
+            
+            // Start typing animation for AI messages
+            if !message.isUser && !message.isThinking && displayedText.isEmpty {
+                startTypingAnimation()
+            } else if message.isUser {
+                displayedText = message.content
+            }
+        }
+    }
+    
+    private func startTypingAnimation() {
+        isTyping = true
+        displayedText = ""
+        var characterIndex = 0
+        
+        // Trigger haptic for first character
+        HapticFeedback.tick()
+        
+        Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { timer in
+            if characterIndex < message.content.count {
+                let index = message.content.index(message.content.startIndex, offsetBy: characterIndex)
+                displayedText.append(message.content[index])
+                characterIndex += 1
+            } else {
+                timer.invalidate()
+                isTyping = false
+                // Trigger haptic on completion
+                HapticFeedback.tick()
+            }
+        }
+    }
+    
+    private func toggleSpeech() {
+        if isPlaying {
+            speechSynthesizer.stopSpeaking(at: .immediate)
+            isPlaying = false
+        } else {
+            let utterance = AVSpeechUtterance(string: message.content)
+            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
+            utterance.rate = 0.5
+            speechSynthesizer.speak(utterance)
+            isPlaying = true
+        }
+    }
+}
+
+// Rich Markdown View
+struct RichMarkdownView: View {
+    let text: String
+    
+    var body: some View {
+        if let attributedString = try? AttributedString(markdown: text) {
+            Text(attributedString)
+                .textSelection(.enabled)
+        } else {
+            Text(text)
+                .textSelection(.enabled)
+        }
+    }
+}
+
+// Enhanced Action Button
+struct ActionButton: View {
+    let icon: String
+    let title: String
+    let action: () -> Void
+    
+    @State private var isPressed = false
+    
+    var body: some View {
+        Button(action: {
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isPressed = true
+            }
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeInOut(duration: 0.1)) {
+                    isPressed = false
+                }
+                action()
+                HapticFeedback.impact(style: .light)
+            }
+        }) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.secondary, .secondary.opacity(0.8)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background {
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [.white.opacity(0.2), .clear],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 4, y: 2)
+                }
+                .scaleEffect(isPressed ? 0.95 : 1.0)
+                .offset(y: isPressed ? 1 : 0)
+        }
+    }
+}
+
+// Enhanced Thinking Indicator
+struct EnhancedThinkingIndicator: View {
+    @State private var dots = [false, false, false]
+    
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<3) { index in
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [.blue.opacity(0.8), .purple],
+                            center: .center,
+                            startRadius: 1,
+                            endRadius: 5
+                        )
+                    )
+                    .frame(width: 12, height: 12)
+                    .scaleEffect(dots[index] ? 1.3 : 0.7)
+                    .opacity(dots[index] ? 1 : 0.5)
+                    .animation(
+                        .easeInOut(duration: 0.6)
+                        .repeatForever()
+                        .delay(Double(index) * 0.2),
+                        value: dots[index]
+                    )
+            }
+        }
+        .padding(.horizontal, 24)
+        .padding(.vertical, 16)
+        .background {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 8, y: 4)
+        }
+        .onAppear {
+            for index in 0..<3 {
+                dots[index] = true
+            }
+        }
+    }
+}
+
+
+
+
+
+
+//// MARK: -  Gradient Definitions
 struct Gradients {
     static let primary = LinearGradient(
         colors: [.blue, .purple, .pink],
@@ -28,7 +325,7 @@ struct Gradients {
     )
 }
 
-// MARK: - Animated Gradient Border Button
+//// MARK: - Animated Gradient Border Button
 struct AnimatedGradientButton: View {
     let title: String
     let icon: String?
@@ -94,7 +391,7 @@ struct AnimatedGradientButton: View {
     }
 }
 
-// MARK: - Glass Morphism Card
+//// MARK: - Glass Morphism Card
 struct GlassMorphismCard: View {
     let content: AnyView
     var padding: CGFloat = 16
@@ -119,7 +416,7 @@ struct GlassMorphismCard: View {
     }
 }
 
-// MARK: - Animated Send Button
+//// MARK: - Animated Send Button
 struct AnimatedSendButton: View {
     let isEnabled: Bool
     let action: () -> Void
@@ -154,187 +451,8 @@ struct AnimatedSendButton: View {
     }
 }
 
-// MARK: -  Message Bubble
-struct MessageBubble: View {
-    let message: Message
-    @State private var appeared = false
-    @State private var isPlaying = false
-    @State private var speechSynthesizer = AVSpeechSynthesizer()
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            if !message.isUser {
-                // AI Avatar
-                Circle()
-                    .fill(Gradients.primary)
-                    .frame(width: 32, height: 32)
-                    .overlay {
-                        Image(systemName: "brain.head.profile")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .shadow(color: .purple.opacity(0.3), radius: 5)
-            }
-            
-            if message.isUser {
-                Spacer(minLength: 50)
-            }
-            
-            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 6) {
-                if message.isThinking {
-                    ThinkingIndicator()
-                } else {
-                    // Message content with  styling
-                    Markdown(text: message.content)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
-                        .background {
-                            if message.isUser {
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .fill(Gradients.primary)
-                            } else {
-                                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                    .fill(.ultraThinMaterial)
-                                    .overlay {
-                                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                                            .stroke(Gradients.glass, lineWidth: 1)
-                                    }
-                            }
-                        }
-                        .foregroundColor(message.isUser ? .white : .primary)
-                    
-                    // Action buttons for AI messages
-                    if !message.isUser && !message.content.isEmpty {
-                        HStack(spacing: 16) {
-                            ActionButton(icon: "doc.on.doc", title: "Copy") {
-                                UIPasteboard.general.string = message.content
-                                HapticFeedback.success()
-                            }
-                            
-                            ActionButton(
-                                icon: isPlaying ? "stop.circle" : "play.circle",
-                                title: isPlaying ? "Stop" : "Play"
-                            ) {
-                                toggleSpeech()
-                            }
-                        }
-                        .padding(.top, 4)
-                    }
-                }
-            }
-            
-            if !message.isUser {
-                Spacer(minLength: 50)
-            }
-            
-            if message.isUser {
-                // User Avatar
-                Circle()
-                    .fill(Gradients.accent)
-                    .frame(width: 32, height: 32)
-                    .overlay {
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    .shadow(color: .orange.opacity(0.3), radius: 5)
-            }
-        }
-        .padding(.horizontal)
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 20)
-        .onAppear {
-            withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
-                appeared = true
-            }
-        }
-    }
-    
-    private func toggleSpeech() {
-        if isPlaying {
-            speechSynthesizer.stopSpeaking(at: .immediate)
-            isPlaying = false
-        } else {
-            let utterance = AVSpeechUtterance(string: message.content)
-            utterance.voice = AVSpeechSynthesisVoice(language: "en-US")
-            utterance.rate = 0.5
-            speechSynthesizer.speak(utterance)
-            isPlaying = true
-        }
-    }
-}
 
-// MARK: -  Action Button
-struct ActionButton: View {
-    let icon: String
-    let title: String
-    let action: () -> Void
-    
-    @State private var isHovered = false
-    
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background {
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule()
-                                .stroke(Color.secondary.opacity(0.2), lineWidth: 1)
-                        }
-                }
-                .scaleEffect(isHovered ? 1.05 : 1.0)
-        }
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isHovered = hovering
-            }
-        }
-    }
-}
-
-// MARK: -  Thinking Indicator
-struct ThinkingIndicator: View {
-    @State private var dots = [false, false, false]
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<3) { index in
-                Circle()
-                    .fill(Gradients.primary)
-                    .frame(width: 10, height: 10)
-                    .scaleEffect(dots[index] ? 1.3 : 0.8)
-                    .animation(
-                        .easeInOut(duration: 0.6)
-                        .repeatForever()
-                        .delay(Double(index) * 0.2),
-                        value: dots[index]
-                    )
-            }
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 16)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule()
-                        .stroke(Gradients.glass, lineWidth: 1)
-                }
-        }
-        .onAppear {
-            for index in 0..<3 {
-                dots[index] = true
-            }
-        }
-    }
-}
-
-// MARK: -  Input Field
+//// MARK: -  Input Field
 struct InputField: View {
     @Binding var text: String
     @Binding var height: CGFloat
@@ -396,42 +514,3 @@ struct InputField: View {
     }
 }
 
-// MARK: -  Navigation Bar
-struct NavigationBar: View {
-    let title: String
-    let leftButton: AnyView?
-    let rightButton: AnyView?
-    
-    init(title: String, leftButton: AnyView? = nil, rightButton: AnyView? = nil) {
-        self.title = title
-        self.leftButton = leftButton
-        self.rightButton = rightButton
-    }
-    
-    var body: some View {
-        HStack {
-            if let leftButton = leftButton {
-                leftButton
-            }
-            
-            Spacer()
-            
-            Text(title)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
-                .foregroundStyle(Gradients.primary)
-            
-            Spacer()
-            
-            if let rightButton = rightButton {
-                rightButton
-            }
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 12)
-        .background {
-            Rectangle()
-                .fill(.ultraThinMaterial)
-                .ignoresSafeArea()
-        }
-    }
-}

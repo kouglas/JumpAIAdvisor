@@ -14,13 +14,22 @@ struct ContentView: View {
         @FocusState private var isInputFocused: Bool
         @State private var showConversationList = false
         @State private var showRealTimeChat = false
-        @State private var keyboardHeight: CGFloat = 0
+//        @State private var keyboardHeight: CGFloat = 0
         
         var body: some View {
             NavigationStack {
                 ZStack {
                     // Radial animated background
-                    RadialAnimatedBackground()
+//                    RadialAnimatedBackground()
+                    LinearGradient(
+                                       colors: [
+                                           Color(red: 0.1, green: 0.1, blue: 0.2),
+                                           Color(red: 0.05, green: 0.05, blue: 0.15)
+                                       ],
+                                       startPoint: .top,
+                                       endPoint: .bottom
+                                   )
+                                   .ignoresSafeArea()
                     
                     VStack(spacing: 0) {
                         // Centered navigation bar
@@ -33,7 +42,7 @@ struct ContentView: View {
                             ScrollView {
                                 LazyVStack(spacing: 16) {
                                     ForEach(chatManager.currentConversation?.messages ?? []) { message in
-                                        ScrollAwareMessageBubble(message: message)
+                                        MessageBubbleView(message: message)
                                             .id(message.id)
                                     }
                                 }
@@ -85,19 +94,137 @@ struct ContentView: View {
                 .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { notification in
                     if let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
                         withAnimation(.easeOut(duration: 0.25)) {
-                            keyboardHeight = keyboardFrame.height
+//                            keyboardHeight = keyboardFrame.height
                         }
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
                     withAnimation(.easeOut(duration: 0.25)) {
-                        keyboardHeight = 0
+//                        keyboardHeight = 0
                     }
                 }
             }
         }
     }
 
+
+struct MessageBubbleView: View {
+    let message: Message
+    @State private var displayedText = ""
+    @State private var isTyping = false
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            if !message.isUser {
+                // AI Avatar with proper spacing
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.purple.opacity(0.8), Color.blue],
+                            center: .center,
+                            startRadius: 1,
+                            endRadius: 16
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+                    .overlay {
+                        Image(systemName: "brain")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.leading, 16) // Add left padding
+            } else {
+                Spacer()
+            }
+            
+            VStack(alignment: message.isUser ? .trailing : .leading, spacing: 8) {
+                // Message bubble
+                if message.content.contains("Error:") {
+                    // Error message styling
+                    Text(message.content)
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(Color.red.opacity(0.8))
+                        }
+                } else {
+                    // Normal message
+                    Text(displayedText.isEmpty ? message.content : displayedText)
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .background {
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .fill(message.isUser ? Color.blue : Color.gray.opacity(0.3))
+                        }
+                }
+                
+                // Action buttons for AI messages
+                if !message.isUser && !message.content.isEmpty && !message.content.contains("Error:") {
+                    HStack(spacing: 16) {
+                        Button(action: {
+                            UIPasteboard.general.string = message.content
+                            HapticFeedback.success()
+                        }) {
+                            Label("Copy", systemImage: "doc.on.clipboard")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        Button(action: {
+                            // Play action
+                        }) {
+                            Label("Play", systemImage: "play.circle")
+                                .font(.caption)
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .padding(.leading, 16)
+                }
+            }
+            .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.isUser ? .trailing : .leading)
+            
+            if message.isUser {
+                // User Avatar with proper spacing
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [Color.orange.opacity(0.8), Color.pink],
+                            center: .center,
+                            startRadius: 1,
+                            endRadius: 16
+                        )
+                    )
+                    .frame(width: 36, height: 36)
+                    .overlay {
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 20, weight: .bold))
+                            .foregroundColor(.white)
+                    }
+                    .padding(.trailing, 16) // Add right padding
+            } else {
+                Spacer()
+            }
+        }
+        .onAppear {
+            // Start typing animation for AI messages
+            if !message.isUser && displayedText.isEmpty && !message.content.contains("Error:") {
+                startTypingAnimation()
+            } else {
+                displayedText = message.content
+            }
+        }
+    }
+    
+    private func startTypingAnimation() {
+        // Animation code here
+        displayedText = message.content // For now, show all at once
+    }
+}
 
 
 // Centered Navigation Bar
@@ -530,7 +657,9 @@ struct MessageInputView: View {
         }
     }
 }
-#Preview {
-    ContentView(chatManager: ChatManager())
-    .preferredColorScheme(.dark)
-}
+
+
+//#Preview {
+//    ContentView(chatManager: ChatManager())
+//    .preferredColorScheme(.dark)
+//}

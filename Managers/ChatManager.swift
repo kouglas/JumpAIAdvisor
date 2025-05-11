@@ -116,6 +116,23 @@ class ChatManager: ObservableObject {
             }
         )
     }
+    private func handleError(_ errorMessage: String) {
+        self.isLoading = false
+        
+        // Remove thinking message and add error message
+        if var updatedConversation = self.currentConversation {
+            updatedConversation.messages.removeAll { $0.isThinking }
+            
+            let errorMsg = Message(
+                content: errorMessage,
+                isUser: false
+            )
+            updatedConversation.messages.append(errorMsg)
+            self.updateConversation(updatedConversation)
+        }
+        
+        HapticFeedback.error()
+    }
     
     private func updateConversation(_ conversation: Conversation) {
         if let index = conversations.firstIndex(where: { $0.id == conversation.id }) {

@@ -37,6 +37,8 @@ class AudioManager: NSObject, ObservableObject {
     override init() {
         super.init()
         speechSynthesizer.delegate = self
+        print("🚀 Setting up audio manager...")
+        requestMicrophonePermission()
     }
     
     func requestMicrophonePermission() {
@@ -77,12 +79,45 @@ class AudioManager: NSObject, ObservableObject {
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.record, mode: .spokenAudio, options: [.defaultToSpeaker])
+            // Changed from .record to .playAndRecord to support defaultToSpeaker
+            try audioSession.setCategory(.playAndRecord,
+                                        mode: .spokenAudio,
+                                        options: [.defaultToSpeaker, .allowBluetoothA2DP])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             print("✅ Audio session configured successfully")
         } catch {
             errorMessage = "Failed to setup audio session: \(error.localizedDescription)"
             print("❌ Audio session error: \(error)")
+        }
+    }
+    
+    // Configure audio session specifically for recording
+    private func configureAudioSessionForRecording() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            // Use playAndRecord with defaultToSpeaker for consistent behavior
+            try audioSession.setCategory(.playAndRecord,
+                                        mode: .spokenAudio,
+                                        options: [.defaultToSpeaker, .allowBluetoothA2DP])
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("❌ Failed to configure audio session for recording: \(error)")
+            errorMessage = "Failed to configure recording: \(error.localizedDescription)"
+        }
+    }
+    
+    // Configure audio session specifically for playback
+    private func configureAudioSessionForPlayback() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            // For playback only, but stay consistent with playAndRecord category
+            try audioSession.setCategory(.playAndRecord,
+                                        mode: .spokenAudio,
+                                        options: [.defaultToSpeaker, .allowBluetoothA2DP])
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("❌ Failed to configure audio session for playback: \(error)")
+            errorMessage = "Failed to configure playback: \(error.localizedDescription)"
         }
     }
     
@@ -107,8 +142,7 @@ class AudioManager: NSObject, ObservableObject {
             }
             
             // Configure audio session for recording
-            try AVAudioSession.sharedInstance().setCategory(.record, mode: .spokenAudio)
-            try AVAudioSession.sharedInstance().setActive(true)
+            configureAudioSessionForRecording()
             
             recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
             
@@ -196,6 +230,9 @@ class AudioManager: NSObject, ObservableObject {
     
     private func speakResponse(_ text: String) {
         print("🔊 Speaking response: \(text)")
+        
+        // Configure audio session for playback before speaking
+        configureAudioSessionForPlayback()
         
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = 0.5

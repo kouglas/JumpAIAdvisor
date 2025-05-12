@@ -148,6 +148,7 @@ struct MessageBubbleView: View {
     @State private var isPlaying = false
     @State private var speechSynthesizer: AVSpeechSynthesizer?
     @State private var appeared = false
+    @State private var speechDelegate: SpeechDelegate?
     
     // Custom gradient for user messages
     private let userGradient = LinearGradient(
@@ -317,6 +318,9 @@ struct MessageBubbleView: View {
             speechSynthesizer?.stopSpeaking(at: .immediate)
             speechSynthesizer = nil
             isPlaying = false
+            
+            speechDelegate = nil
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } else {
             // Create and configure synthesizer immediately
             let synthesizer = AVSpeechSynthesizer()
@@ -344,6 +348,14 @@ struct MessageBubbleView: View {
 //                self.speechSynthesizer = nil
 //            }
             
+            let delegate = SpeechDelegate { 
+                       self.isPlaying = false
+                       self.speechSynthesizer = nil
+                   }
+                   synthesizer.delegate = delegate
+                   // Store delegate reference to prevent deallocation
+                   self.speechDelegate = delegate
+                   
             isPlaying = true
             synthesizer.speak(utterance)
         }
@@ -355,6 +367,7 @@ struct MessageBubbleView: View {
         
         init(completion: @escaping () -> Void) {
             self.completion = completion
+            super.init()
         }
         
         func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {

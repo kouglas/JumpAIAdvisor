@@ -1,22 +1,15 @@
-//
-//  RealTimeChatView.swift
-//  JumpAIAdvisor
-//
-//  Created by Kari Douglas on 5/10/25.
-//
-
 import SwiftUI
 import AVFoundation
 
 struct RealTimeChatView: View {
     @Environment(\.dismiss) private var dismiss
     @StateObject private var audioManager = AudioManager()
-    @State private var visualizationState: VisualizationState = .idle
+    @State private var visualizationState: VisualizationState = .listening
     @State private var audioLevel: CGFloat = 0.0
     @State private var hasAppeared = false
+    @State private var permissionRequested = false
     
     enum VisualizationState {
-        case idle
         case listening  // Shows orbiting lines
         case speaking   // Shows horizontal waveform
     }
@@ -34,10 +27,14 @@ struct RealTimeChatView: View {
                     // Visualization content
                     Group {
                         switch visualizationState {
-                        case .idle:
-                            IdleOrbitingBall()
                         case .listening:
                             ListeningOrbitingBall()
+                                .onTapGesture {
+                                    // If listening stops, restart it on tap
+                                    if !audioManager.isListening {
+                                        audioManager.startListening()
+                                    }
+                                }
                         case .speaking:
                             SpeakingWaveform(audioLevel: audioLevel)
                         }
@@ -79,6 +76,45 @@ struct RealTimeChatView: View {
                 Spacer()
             }
             
+            // Permission error overlay
+            if audioManager.showPermissionAlert {
+                VStack {
+                    Spacer()
+                    VStack(spacing: 16) {
+                        Image(systemName: "mic.slash")
+                            .font(.system(size: 40))
+                            .foregroundColor(.red)
+                        
+                        Text("Microphone Access Required")
+                            .font(.headline)
+                        
+                        Text("Please enable microphone access in Settings to use the voice chat feature.")
+                            .multilineTextAlignment(.center)
+                        
+                        Button(action: {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            Text("Open Settings")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .padding()
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Color.blue))
+                        }
+                        .padding(.top, 8)
+                    }
+                    .padding()
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(16)
+                    .padding()
+                    
+                    Spacer()
+                }
+                .transition(.opacity)
+                .animation(.easeInOut, value: audioManager.showPermissionAlert)
+            }
+            
             // Debug information overlay
             VStack {
                 Spacer()
@@ -109,134 +145,86 @@ struct RealTimeChatView: View {
             }
         }
         .onAppear {
-            if !hasAppeared {
-                hasAppeared = true
-                setupAudioManager()
+            setupAudioManager()
+            
+            // Start audio level animation for speaking state
+            Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
+                if visualizationState == .speaking {
+                    withAnimation(.easeInOut(duration: 0.1)) {
+                        audioLevel = CGFloat.random(in: 0.2...1.0)
+                    }
+                }
+            }
+            
+            // Auto-start listening with a slight delay to ensure proper initialization
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                startListeningIfPossible()
+            }
+        }
+        // Check for permission changes and attempt to start listening
+        .onChange(of: audioManager.hasPermission) { newValue in
+            if newValue {
+                startListeningIfPossible()
             }
         }
     }
     
     private var statusText: String {
         switch visualizationState {
-        case .idle:
-            return "Tap to speak"
         case .listening:
-            return "Listening..."
+            return audioManager.isListening ? "Listening..." : "Tap to speak"
         case .speaking:
             return "AI is speaking..."
         }
     }
     
     private func setupAudioManager() {
-        print("🚀 Setting up audio manager...")
+        print("🎧 Setting up RealTimeChatView audio manager...")
         
         audioManager.delegate = AudioDelegate(
             onStartListening: {
                 withAnimation(.spring()) {
                     visualizationState = .listening
                 }
+                print("▶️ Started listening in RealTimeChatView")
             },
             onStopListening: {
-                withAnimation(.spring()) {
-                    if visualizationState == .listening {
-                        visualizationState = .idle
-                    }
+                // Only go to idle if we're not speaking (keep the state as speaking if we are)
+                if visualizationState == .listening {
+                    print("⏹️ Stopped listening in RealTimeChatView")
                 }
             },
             onStartSpeaking: {
                 withAnimation(.spring()) {
                     visualizationState = .speaking
                 }
+                print("🔊 Started speaking in RealTimeChatView")
             },
             onStopSpeaking: {
                 withAnimation(.spring()) {
-                    visualizationState = .idle
+                    visualizationState = .listening
                 }
-            }
-        )
-        
-        // Request permissions and start listening
-        if audioManager.hasPermission {
-            audioManager.startListening()
-        } else {
-            audioManager.requestMicrophonePermission()
-        }
-        
-        // Start audio level animation for speaking state
-        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { timer in
-            if visualizationState == .speaking {
-                withAnimation(.easeInOut(duration: 0.1)) {
-                    audioLevel = CGFloat.random(in: 0.2...1.0)
-                }
-            }
-        }
-    }
-}
-
-// Idle state: Slow orbiting lines
-struct IdleOrbitingBall: View {
-    @State private var rotation = 0.0
-    
-    var body: some View {
-        TimelineView(.animation) { timeline in
-            Canvas { context, size in
-                let center = CGPoint(x: size.width/2, y: size.height/2)
-                let time = timeline.date.timeIntervalSinceReferenceDate * 0.3 // Slow rotation
+                print("🔇 Stopped speaking in RealTimeChatView")
                 
-                // Draw 3-4 orbiting lines
-                for i in 0..<3 {
-                    let angle = Double(i) * 120 + time * 30
-                    drawOrbitingLine(
-                        context: context,
-                        center: center,
-                        radius: 100,
-                        angle: angle,
-                        thickness: 3,
-                        alpha: 0.5
-                    )
+                // Auto-restart listening after speaking finishes
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    startListeningIfPossible()
                 }
             }
-        }
+        )
     }
     
-    private func drawOrbitingLine(context: GraphicsContext, center: CGPoint, radius: CGFloat, angle: Double, thickness: CGFloat, alpha: Double) {
-        let startAngle = angle * .pi / 180
-        let endAngle = (angle + 120) * .pi / 180
-        
-        let startPoint = CGPoint(
-            x: center.x + radius * cos(startAngle),
-            y: center.y + radius * sin(startAngle) * 0.5 // Perspective
-        )
-        
-        let endPoint = CGPoint(
-            x: center.x + radius * cos(endAngle),
-            y: center.y + radius * sin(endAngle) * 0.5 // Perspective
-        )
-        
-        var path = Path()
-        path.move(to: startPoint)
-        
-        // Create a curved line
-        let control1 = CGPoint(
-            x: center.x + radius * 1.2 * cos(startAngle + .pi/3),
-            y: center.y + radius * 0.6 * sin(startAngle + .pi/3)
-        )
-        
-        path.addQuadCurve(to: endPoint, control: control1)
-        
-        context.stroke(
-            path,
-            with: .linearGradient(
-                Gradient(colors: [
-                    .blue.opacity(alpha),
-                    .purple.opacity(alpha),
-                    .pink.opacity(alpha)
-                ]),
-                startPoint: startPoint,
-                endPoint: endPoint
-            ),
-            lineWidth: thickness
-        )
+    private func startListeningIfPossible() {
+        // Only try to start listening if we're not already listening
+        if !audioManager.isListening {
+            print("🎤 Attempting to start listening...")
+            if audioManager.hasPermission {
+                audioManager.startListening()
+            } else if !permissionRequested {
+                permissionRequested = true
+                audioManager.requestMicrophonePermission()
+            }
+        }
     }
 }
 
@@ -449,13 +437,5 @@ struct SpeakingWaveform: View {
             Circle().path(in: rightAnchorRect),
             with: .color(.orange)
         )
-    }
-}
-
-// Preference key for scroll detection
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }

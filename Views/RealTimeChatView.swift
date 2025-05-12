@@ -860,11 +860,3 @@ struct SpeakingWaveform: View {
     }
 }
 
-// Additional haptic feedback extension
-//extension HapticFeedback {
-//    static func tick() {
-//        let generator = UIImpactFeedbackGenerator(style: .light)
-//        generator.prepare()
-//        generator.impactOccurred(intensity: 0.4)
-//    }
-//}
